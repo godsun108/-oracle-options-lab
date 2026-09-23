@@ -219,7 +219,7 @@ jobs:
           t.to_csv("out/oracle_stage9_signal_schedule.csv",index=False)
 
           # Unadjusted underlying prices from the same options-data repository establish ATM strike scale.
-          UP="https://raw.githubusercontent.com/anahatsingh-ui/options-dataset-hist/main/underlying_prices.parquet"
+          UP="https://raw.githubusercontent.com/anahatsingh-ui/options-dataset-hist/main/spy/underlying_prices.parquet"
           pr=requests.get(UP,timeout=180); pr.raise_for_status()
           spot=pd.read_parquet(io.BytesIO(pr.content))
           # Normalize common schema variants without silently using adjusted signal prices for ATM.
