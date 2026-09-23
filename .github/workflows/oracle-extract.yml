@@ -311,7 +311,13 @@ jobs:
           # Re-fetch same underlying history used by the frozen workflow.
           raw=pd.read_csv("https://raw.githubusercontent.com/OStochastic/Daily-SPY-data-from-2000-2025/main/spy_data.csv", index_col=0).reset_index()
           raw.columns=[str(c).lower().strip().replace(" ","_") for c in raw.columns]
-          date_candidates=[c for c in raw.columns if "date" in c]\n          if not date_candidates:\n              # Source stores dates in the first/index column; fail loudly if parsing is impossible.\n              raw=raw.rename(columns={raw.columns[0]:"date"})\n              datecol="date"\n          else:\n              datecol=date_candidates[0]
+          date_candidates=[c for c in raw.columns if "date" in c]
+          if not date_candidates:
+              # Source stores dates in the first/index column.
+              raw=raw.rename(columns={raw.columns[0]:"date"})
+              datecol="date"
+          else:
+              datecol=date_candidates[0]
           raw=raw.rename(columns={datecol:"date"})
           closecol=next(c for c in raw.columns if c in ("close","adj_close","adjclose"))
           if closecol!="close": raw=raw.rename(columns={closecol:"close"})
