@@ -308,22 +308,21 @@ jobs:
 
           u=pd.read_csv("out/oracle_stage9_signals.csv")
           trades=pd.read_csv("out/oracle_stage9_options_trades.csv")
-          # Re-fetch same underlying history used by the frozen workflow.
-          raw=pd.read_csv("https://raw.githubusercontent.com/OStochastic/Daily-SPY-data-from-2000-2025/main/spy_data.csv", index_col=0).reset_index()
-          raw.columns=[str(c).lower().strip().replace(" ","_") for c in raw.columns]
-          date_candidates=[c for c in raw.columns if "date" in c]
-          if not date_candidates:
-              # Source stores dates in the first/index column.
-              raw=raw.rename(columns={raw.columns[0]:"date"})
-              datecol="date"
-          else:
-              datecol=date_candidates[0]
-          raw=raw.rename(columns={datecol:"date"})
-          closecol=next(c for c in raw.columns if c in ("close","adj_close","adjclose"))
-          if closecol!="close": raw=raw.rename(columns={closecol:"close"})
-          volcols=[c for c in raw.columns if c=="volume"]
-          keep=["date","close"]+volcols
-          feat=build_regime_features(raw[keep])
+          # Re-fetch the same underlying history used by the frozen workflow.
+          # This CSV has two metadata rows ("SPY", field labels) below the header,
+          # so parse it exactly as the frozen Stage-9 job does instead of guessing
+          # its schema from index/column names.
+          raw=pd.read_csv(
+              "https://raw.githubusercontent.com/OStochastic/Daily-SPY-data-from-2000-2025/main/spy_data.csv",
+              skiprows=[1,2],
+          )
+          if raw.shape[1] != 6:
+              raise ValueError(f"Unexpected SPY source schema: {list(raw.columns)}")
+          raw.columns=["date","close","high","low","open","volume"]
+          raw["date"]=pd.to_datetime(raw["date"],errors="raise")
+          for c in ["close","volume"]:
+              raw[c]=pd.to_numeric(raw[c],errors="raise")
+          feat=build_regime_features(raw[["date","close","volume"]])
           feat["date"]=pd.to_datetime(feat.date).dt.normalize()
 
           t=trades[trades.status=="ok"].copy()
