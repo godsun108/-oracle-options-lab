@@ -199,76 +199,102 @@ jobs:
                 err=sum(abs(a-b) for a,b in zip(vals,target))
                 stage6.append({"periods":periods,"threshold":round(float(thr),4),"episode_gap":episode_gap,"discovery":vals[0],"validation":vals[1],"holdout":vals[2],"total":len(z),"fingerprint_error":err})
           pd.DataFrame(stage6).sort_values(["fingerprint_error","total"]).to_csv("out/oracle_stage6_episode_grid.csv",index=False)
-          # Audit the signal reconstruction before interpreting option outcomes.
-          # Export every underlying signal and counts by research split/year.
-          aud=u.loc[u.signal,["date","close","volume","ma200","vol20_prior","ret5"]].copy()
+          # Stage 9: freeze the Stage-7 lead rule and correct the options execution engine.
+          # Signal: 6-session return <= -1%, close > 200DMA. No volume filter.
+          # Options: signal T0 close; enter T+1 EOD ask; exit T+2 EOD bid.
+          u["stage9_signal"]=(u.close.pct_change(6)<=-.01)&(u.close>u.ma200)
+          aud=u.loc[u.stage9_signal,["date","close","volume","ma200"]].copy()
+          aud["ret6"]=u.loc[u.stage9_signal].close.pct_change(6)
           aud["period"]=np.select([aud.date.dt.year<=2016,aud.date.dt.year<=2021],["2000-2016","2017-2021"],default="2022-2025")
-          aud.to_csv("out/oracle_all_underlying_signals.csv",index=False)
-          aud.groupby("period").size().rename("n").reset_index().to_csv("out/oracle_signal_counts_by_period.csv",index=False)
-          aud.assign(year=aud.date.dt.year).groupby("year").size().rename("n").reset_index().to_csv("out/oracle_signal_counts_by_year.csv",index=False)
-          sigidx=u.index[u.signal]
+          aud.to_csv("out/oracle_stage9_signals.csv",index=False)
+
+          sigidx=u.index[u.stage9_signal]
           trades=[]
           for i in sigidx:
               if i+2>=len(u): continue
               sd,ed,xd=u.loc[i,"date"],u.loc[i+1,"date"],u.loc[i+2,"date"]
               if ed.year<2008 or ed>pd.Timestamp("2025-08-29"): continue
               trades.append((sd,ed,xd,float(u.loc[i,"close"]),float(u.loc[i+1,"close"]),float(u.loc[i+2,"close"])))
-          t=pd.DataFrame(trades,columns=["signal_date","entry_date","exit_date","signal_close","entry_underlying_close","exit_underlying_close"])
-          t.to_csv("out/oracle_signal_schedule.csv",index=False)
+          t=pd.DataFrame(trades,columns=["signal_date","entry_date","exit_date","signal_close_adjusted","entry_close_adjusted","exit_close_adjusted"])
+          t.to_csv("out/oracle_stage9_signal_schedule.csv",index=False)
+
+          # Unadjusted underlying prices from the same options-data repository establish ATM strike scale.
+          UP="https://raw.githubusercontent.com/anahatsingh-ui/options-dataset-hist/main/underlying_prices.parquet"
+          pr=requests.get(UP,timeout=180); pr.raise_for_status()
+          spot=pd.read_parquet(io.BytesIO(pr.content))
+          # Normalize common schema variants without silently using adjusted signal prices for ATM.
+          spot.columns=[str(c).lower() for c in spot.columns]
+          if "date" not in spot.columns: raise ValueError("underlying_prices.parquet has no date column")
+          spot["date"]=pd.to_datetime(spot.date)
+          if "symbol" in spot.columns: spot=spot[spot.symbol.astype(str).str.upper()=="SPY"]
+          closecol=next((c for c in ["close","underlying_close","price","last"] if c in spot.columns),None)
+          if closecol is None: raise ValueError("No usable unadjusted close column: "+str(list(spot.columns)))
+          smap=spot.drop_duplicates("date").set_index("date")[closecol]
+          t["entry_spot_unadjusted"]=t.entry_date.map(smap)
+          t["exit_spot_unadjusted"]=t.exit_date.map(smap)
 
           years=sorted(set(t.entry_date.dt.year)|set(t.exit_date.dt.year))
-          chains={}
+          chains=[]
+          wanted=set(t.entry_date)|set(t.exit_date)
           for y in years:
-              r=requests.get(BASE.format(y),timeout=180); r.raise_for_status()
-              d=pd.read_parquet(io.BytesIO(r.content))
+              rr=requests.get(BASE.format(y),timeout=180); rr.raise_for_status()
+              d=pd.read_parquet(io.BytesIO(rr.content))
               d["date"]=pd.to_datetime(d.date); d["expiration"]=pd.to_datetime(d.expiration)
-              d=d[d["date"].isin(set(t.entry_date)|set(t.exit_date))].copy()
-              chains[y]=d
-          allc=pd.concat(chains.values(),ignore_index=True)
+              chains.append(d[d.date.isin(wanted)].copy())
+          allc=pd.concat(chains,ignore_index=True)
 
-          specs=[
-            ("O1_ATM_2_3DTE",.50,2,3),("O2_D40_2_3DTE",.40,2,3),("O3_D25_2_3DTE",.25,2,3),
-            ("O4_ATM_7_10DTE",.50,7,10),("O5_D40_7_10DTE",.40,7,10),("O6_D25_7_10DTE",.25,7,10)]
+          specs=[("O1_ATM_2_3DTE","atm",2,3),("O2_D40_2_3DTE",.40,2,3),("O3_D25_2_3DTE",.25,2,3),
+                 ("O4_ATM_7_10DTE","atm",7,10),("O5_D40_7_10DTE",.40,7,10),("O6_D25_7_10DTE",.25,7,10)]
           rows=[]
           for tr in t.itertuples(index=False):
-              ent=allc[(allc.date==tr.entry_date)&(allc.type=="call")].copy()
+              ent=allc[(allc.date==tr.entry_date)&(allc.type.astype(str).str.lower()=="call")].copy()
               for name,target,lo,hi in specs:
                   q=ent.copy(); q["dte"]=(q.expiration-q.date).dt.days
-                  q=q[(q.dte>=lo)&(q.dte<=hi)&q.delta.notna()&(q.ask>0)]
+                  q=q[(q.dte>=lo)&(q.dte<=hi)&(q.bid>0)&(q.ask>0)&(q.ask>=q.bid)]
+                  if target!="atm": q=q[q.delta.notna()]
                   if q.empty:
-                      rows.append({**tr._asdict(),"spec":name,"status":"no_entry_contract"}); continue
-                  q["dist"]=(q.delta-target).abs()
-                  e=q.sort_values(["dist","ask"]).iloc[0]
-                  ex=allc[(allc.date==tr.exit_date)&(allc.contract_id==e.contract_id)]
-                  if ex.empty or not np.isfinite(ex.iloc[0].bid):
-                      rows.append({**tr._asdict(),"spec":name,"status":"no_exit_quote","contract_id":e.contract_id}); continue
-                  x=ex.iloc[0]; entry=float(e.ask); exitp=float(x.bid)
-                  ret=exitp/entry-1 if entry>0 else np.nan
+                      rows.append({**tr._asdict(),"spec":name,"status":"no_valid_entry_contract"}); continue
+                  if target=="atm":
+                      if not np.isfinite(tr.entry_spot_unadjusted):
+                          rows.append({**tr._asdict(),"spec":name,"status":"missing_unadjusted_spot"}); continue
+                      q["dist"]=(q.strike-tr.entry_spot_unadjusted).abs()
+                  else: q["dist"]=(q.delta-float(target)).abs()
+                  q["oi_sort"]=pd.to_numeric(q.open_interest,errors="coerce").fillna(-1)
+                  q["spread"]=q.ask-q.bid
+                  q["cid_sort"]=q.contract_id.astype(str)
+                  e=q.sort_values(["dist","oi_sort","spread","cid_sort"],ascending=[True,False,True,True]).iloc[0]
+                  ex=allc[(allc.date==tr.exit_date)&(allc.contract_id==e.contract_id)].copy()
+                  ex=ex[(ex.bid>0)&(ex.ask>0)&(ex.ask>=ex.bid)]
+                  if ex.empty:
+                      rows.append({**tr._asdict(),"spec":name,"status":"no_valid_exit_quote","contract_id":e.contract_id}); continue
+                  x=ex.sort_values("contract_id").iloc[0]
+                  entry=float(e.ask); exitp=float(x.bid); pnl=(exitp-entry)*100.; ret=(exitp-entry)/entry
                   rows.append({**tr._asdict(),"spec":name,"status":"ok","contract_id":e.contract_id,
-                    "expiration":e.expiration,"strike":e.strike,"entry_delta":e.delta,"entry_bid":e.bid,"entry_ask":entry,
-                    "exit_bid":exitp,"exit_ask":x.ask,"option_return":ret,
-                    "underlying_return_entry_to_exit":tr.exit_underlying_close/tr.entry_underlying_close-1})
-          r=pd.DataFrame(rows); r.to_csv("out/oracle_o1_o6_trades.csv",index=False)
-          ok=r[r.status=="ok"].copy()
+                    "expiration":e.expiration,"dte":int(e.dte),"strike":float(e.strike),"entry_delta":e.delta,
+                    "entry_bid":float(e.bid),"entry_ask":entry,"entry_open_interest":e.open_interest,
+                    "exit_bid":exitp,"exit_ask":float(x.ask),"option_return":ret,"one_contract_pnl":pnl})
+          res=pd.DataFrame(rows); res.to_csv("out/oracle_stage9_options_trades.csv",index=False)
+
+          attempts=res.groupby("spec").size().rename("n_attempted")
+          eligible=res[res.status=="ok"].groupby("spec").size().rename("n_eligible")
+          missing=res[res.status!="ok"].groupby(["spec","status"]).size().rename("n").reset_index()
+          missing.to_csv("out/oracle_stage9_missing_reasons.csv",index=False)
+          ok=res[res.status=="ok"].copy()
           if len(ok):
-              ok["period"]=np.select([ok.entry_date.dt.year<=2016,ok.entry_date.dt.year<=2021],
-                                     ["2008-2016","2017-2021"],default="2022-2025")
-              def stats(g):
-                  rr=g.option_return.dropna()
-                  wealth=(1+rr).cumprod(); dd=wealth/wealth.cummax()-1
-                  return pd.Series({"n":len(rr),"win_rate":(rr>0).mean(),"mean_return":rr.mean(),"median_return":rr.median(),
-                    "avg_winner":rr[rr>0].mean(),"avg_loser":rr[rr<=0].mean(),"best":rr.max(),"worst":rr.min(),
-                    "compound_return":wealth.iloc[-1]-1 if len(wealth) else np.nan,"max_drawdown":dd.min() if len(dd) else np.nan,
-                    "mean_underlying_return":g.underlying_return_entry_to_exit.mean()})
-              summary=pd.concat([
-                ok.groupby(["spec","period"],sort=False).apply(stats,include_groups=False).reset_index(),
-                ok.groupby("spec",sort=False).apply(stats,include_groups=False).reset_index().assign(period="FULL")
-              ],ignore_index=True)
-              summary.to_csv("out/oracle_o1_o6_summary.csv",index=False)
-          with open("out/README.txt","w") as f:
-              f.write("FROZEN EXECUTION: signal at T0 close; enter T+1 EOD at ask; exit T+2 EOD at bid.\n")
-              f.write("O1/O4 ATM operationalized as call delta closest to 0.50; O2/O5 closest 0.40; O3/O6 closest 0.25.\n")
-              f.write("DTE is calendar days at entry. No rules changed after option outcomes.\n")
+              ok["period"]=np.select([ok.entry_date.dt.year<=2016,ok.entry_date.dt.year<=2021],["2008-2016","2017-2021"],default="2022-2025")
+              def stat(g):
+                  rr=g.option_return; pp=g.one_contract_pnl
+                  cum=pp.cumsum(); peak=cum.cummax(); dd=cum-peak
+                  return pd.Series({"n_eligible":len(g),"win_rate":float((pp>0).mean()),"mean_return":rr.mean(),"median_return":rr.median(),
+                    "avg_winner":rr[pp>0].mean(),"avg_loser":rr[pp<=0].mean(),"best_return":rr.max(),"worst_return":rr.min(),
+                    "total_one_contract_pnl":pp.sum(),"max_drawdown_dollars":dd.min() if len(dd) else np.nan})
+              summary=pd.concat([ok.groupby(["spec","period"],sort=False).apply(stat,include_groups=False).reset_index(),
+                ok.groupby("spec",sort=False).apply(stat,include_groups=False).reset_index().assign(period="FULL")],ignore_index=True)
+              summary=summary.merge(attempts,on="spec",how="left")
+              summary.to_csv("out/oracle_stage9_options_summary.csv",index=False)
+          with open("out/STAGE9_README.txt","w") as fh:
+              fh.write("Stage 9 freezes lead Stage-7 rule: 6-session return <= -1%, close above 200DMA, no volume filter.\n")
+              fh.write("Corrected options methodology: T+1 EOD ask to T+2 EOD bid; ATM by strike vs unadjusted SPY spot; delta variants by target delta; strict valid quotes; OI/spread/contract-id tie breaks; one-contract dollar P&L drawdown.\n")
           PY
           python /tmp/oracle.py
       - uses: actions/upload-artifact@v4
