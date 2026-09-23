@@ -30,6 +30,12 @@ jobs:
           u["signal"]=(u.ret5<=-.02)&(u.close>u.ma200)&(u.volume<u.vol20_prior)
           # Reconstruction diagnostic: compare plausible interpretations of "5-session decline".
           # This does NOT alter the frozen options test.
+          # Stage 7 scientific reset: evaluate hypotheses on DISCOVERY only (2000-2016).
+          # The old 107/55/18 fingerprint is retained as historical metadata, not a target,
+          # because no original code/signal-date artifact has been recovered to substantiate it.
+          u["fwd1"]=u.close.shift(-1)/u.close-1
+          u["fwd2"]=u.close.shift(-2)/u.close-1
+          u["fwd3"]=u.close.shift(-3)/u.close-1
           u["ret1"]=u.close.pct_change()
           u["sum5ret"]=u.ret1.rolling(5).sum()
           u["prod5ret"]=(1+u.ret1).rolling(5).apply(np.prod,raw=True)-1
@@ -75,6 +81,25 @@ jobs:
                 stage2.append({"price":pn,"ma":mn,"volume":vn,"discovery":int(c.get("2000-2016",0)),"validation":int(c.get("2017-2021",0)),"holdout":int(c.get("2022-2025",0)),"total":len(z),
                   "fingerprint_error":abs(int(c.get("2000-2016",0))-107)+abs(int(c.get("2017-2021",0))-55)+abs(int(c.get("2022-2025",0))-18)})
           pd.DataFrame(stage2).sort_values(["fingerprint_error","total"]).to_csv("out/oracle_stage2_grid.csv",index=False)
+
+          # Discovery-only candidate research. No later-period data are used to select candidates.
+          research=[]
+          disc=u[u.date.dt.year<=2016].copy()
+          for p in range(2,11):
+            rr=disc.close.pct_change(p)
+            for th in [-.01,-.0125,-.015,-.0175,-.02,-.0225,-.025,-.03,-.035,-.04]:
+              for vname,vcond in [("below",disc.volume<disc.vol20_prior),("above",disc.volume>disc.vol20_prior),("none",pd.Series(True,index=disc.index))]:
+                mask=(rr<=th)&(disc.close>disc.ma200)&vcond
+                x=disc.loc[mask]
+                n=len(x)
+                if n<20: continue
+                for h in [1,2,3]:
+                  vals=x[f"fwd{h}"].dropna()
+                  if len(vals)<20: continue
+                  mean=float(vals.mean()); sd=float(vals.std(ddof=1)); se=sd/np.sqrt(len(vals)) if sd>0 else np.nan
+                  t=mean/se if se and np.isfinite(se) else np.nan
+                  research.append({"periods":p,"threshold":th,"volume":vname,"horizon":h,"n":len(vals),"win_rate":float((vals>0).mean()),"mean_return":mean,"median_return":float(vals.median()),"t_stat":t})
+          pd.DataFrame(research).sort_values(["t_stat","n"],ascending=[False,False]).to_csv("out/oracle_stage7_discovery_only.csv",index=False)
 
           # Stage 3: test threshold/operator conventions without touching option outcomes.
           stage3=[]
