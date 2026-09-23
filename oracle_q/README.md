@@ -28,3 +28,20 @@ subject to capital, concentration, and exposure constraints. Constraints can be 
 5. Hardware experiment only if the emulator demonstrates a reason to incur hardware complexity.
 
 Stage 9 remains the current empirical priority. Oracle Q begins as an isolated research scaffold.
+
+
+## Oracle AI copilot layer
+The AI layer is an analyst/orchestrator, not an oracle with permission to rewrite evidence. It may:
+- summarize frozen experiment outputs and data-quality diagnostics;
+- generate candidate hypotheses for a *future* preregistered experiment;
+- translate approved constraints into optimizer configuration;
+- compare classical, quantum-inspired, and quantum-emulated outputs;
+- produce provenance-rich research briefs and flag anomalies.
+
+It may not:
+- see or use locked holdout outcomes while designing a rule;
+- silently alter signals, thresholds, execution assumptions, or risk limits;
+- choose a backtest winner and present it as validated;
+- place trades without a separate explicit execution/risk-control layer.
+
+Every AI recommendation should be machine-readable and include: timestamp/data cutoff, inputs used, experiment ID, assumptions, proposed action, confidence/uncertainty, and evidence references. This makes the AI useful for speed without letting it contaminate the experiment.
