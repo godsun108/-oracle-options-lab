@@ -297,6 +297,55 @@ jobs:
               fh.write("Corrected options methodology: T+1 EOD ask to T+2 EOD bid; ATM by strike vs unadjusted SPY spot; delta variants by target delta; strict valid quotes; OI/spread/contract-id tie breaks; one-contract dollar P&L drawdown.\n")
           PY
           python /tmp/oracle.py
+
+      - name: Run Oracle regime walk-forward experiment
+        run: |
+          cat > /tmp/oracle_regime.py <<'PY'
+          import pandas as pd, numpy as np, sys
+          sys.path.insert(0,'.')
+          from oracle_q.regime_features import build_regime_features
+          from oracle_q.walk_forward import walk_forward_predict, brier
+
+          u=pd.read_csv("out/oracle_stage9_signals.csv")
+          trades=pd.read_csv("out/oracle_stage9_options_trades.csv")
+          # Re-fetch same underlying history used by the frozen workflow.
+          raw=pd.read_csv("https://raw.githubusercontent.com/OStochastic/Daily-SPY-data-from-2000-2025/main/spy_data.csv")
+          raw.columns=[str(c).lower().strip().replace(" ","_") for c in raw.columns]
+          datecol=next(c for c in raw.columns if "date" in c)
+          raw=raw.rename(columns={datecol:"date"})
+          closecol=next(c for c in raw.columns if c in ("close","adj_close","adjclose"))
+          if closecol!="close": raw=raw.rename(columns={closecol:"close"})
+          volcols=[c for c in raw.columns if c=="volume"]
+          keep=["date","close"]+volcols
+          feat=build_regime_features(raw[keep])
+          feat["date"]=pd.to_datetime(feat.date).dt.normalize()
+
+          t=trades[trades.status=="ok"].copy()
+          t["signal_date"]=pd.to_datetime(t.signal_date).dt.normalize()
+          t["target"]=(pd.to_numeric(t.one_contract_pnl)>0).astype(int)
+          cols=["ret_1","ret_5","ret_20","dist_ma20","dist_ma50","dist_ma200",
+                "rv10","rv20","rv60","vol_ratio_10_60"]
+          if "volume_ratio20" in feat: cols.append("volume_ratio20")
+          rows=[]
+          for spec,g in t.groupby("spec"):
+              z=g.merge(feat[["date"]+cols],left_on="signal_date",right_on="date",how="left")
+              pred=walk_forward_predict(z,cols,"target",date_col="signal_date",min_train=100,l2=1.0)
+              if pred.empty: continue
+              ev=z[["signal_date","target"]].merge(pred,on="signal_date",how="inner")
+              rows.append(ev.assign(spec=spec))
+          out=pd.concat(rows,ignore_index=True) if rows else pd.DataFrame()
+          out.to_csv("out/oracle_regime_walkforward_predictions.csv",index=False)
+          summary=[]
+          if len(out):
+              for spec,g in out.groupby("spec"):
+                  summary.append({"spec":spec,"n":len(g),
+                    "brier_model":brier(g.target,g.p_model),
+                    "brier_unconditional":brier(g.target,g.p_unconditional),
+                    "delta_brier":brier(g.target,g.p_model)-brier(g.target,g.p_unconditional)})
+          pd.DataFrame(summary).to_csv("out/oracle_regime_walkforward_summary.csv",index=False)
+          PY
+          python /tmp/oracle_regime.py
+
       - uses: actions/upload-artifact@v4
         with:
           name: oracle-o1-o6-results
