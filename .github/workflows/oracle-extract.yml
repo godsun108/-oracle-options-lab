@@ -28,6 +28,30 @@ jobs:
           u["vol20_prior"]=u.volume.shift(1).rolling(20).mean()
           u["ret5"]=u.close.pct_change(5)
           u["signal"]=(u.ret5<=-.02)&(u.close>u.ma200)&(u.volume<u.vol20_prior)
+          # Reconstruction diagnostic: compare plausible interpretations of "5-session decline".
+          # This does NOT alter the frozen options test.
+          u["ret1"]=u.close.pct_change()
+          u["sum5ret"]=u.ret1.rolling(5).sum()
+          u["prod5ret"]=(1+u.ret1).rolling(5).apply(np.prod,raw=True)-1
+          u["drop_from_5d_high"]=u.close/u.close.rolling(5).max()-1
+          u["drop_from_prior5_high"]=u.close/u.close.shift(1).rolling(5).max()-1
+          u["five_day_low_vs_start"]=u.close/u.close.shift(4)-1
+          base=(u.close>u.ma200)&(u.volume<u.vol20_prior)
+          variants={
+            "pct_change_5":u.ret5<=-.02,
+            "sum_5_daily_returns":u.sum5ret<=-.02,
+            "compound_5_daily_returns":u.prod5ret<=-.02,
+            "drop_from_5d_high":u.drop_from_5d_high<=-.02,
+            "drop_from_prior5_high":u.drop_from_prior5_high<=-.02,
+            "close_vs_4_sessions_ago":u.five_day_low_vs_start<=-.02,
+          }
+          audit_rows=[]
+          for nm,cond in variants.items():
+              z=u.loc[base&cond,["date"]].copy()
+              z["period"]=np.select([z.date.dt.year<=2016,z.date.dt.year<=2021],["2000-2016","2017-2021"],default="2022-2025")
+              c=z.groupby("period").size()
+              audit_rows.append({"variant":nm,"discovery":int(c.get("2000-2016",0)),"validation":int(c.get("2017-2021",0)),"holdout":int(c.get("2022-2025",0)),"total":len(z)})
+          pd.DataFrame(audit_rows).to_csv("out/oracle_reconstruction_variants.csv",index=False)
           # Audit the signal reconstruction before interpreting option outcomes.
           # Export every underlying signal and counts by research split/year.
           aud=u.loc[u.signal,["date","close","volume","ma200","vol20_prior","ret5"]].copy()
