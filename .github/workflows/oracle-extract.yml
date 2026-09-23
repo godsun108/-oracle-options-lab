@@ -75,6 +75,22 @@ jobs:
                 stage2.append({"price":pn,"ma":mn,"volume":vn,"discovery":int(c.get("2000-2016",0)),"validation":int(c.get("2017-2021",0)),"holdout":int(c.get("2022-2025",0)),"total":len(z),
                   "fingerprint_error":abs(int(c.get("2000-2016",0))-107)+abs(int(c.get("2017-2021",0))-55)+abs(int(c.get("2022-2025",0))-18)})
           pd.DataFrame(stage2).sort_values(["fingerprint_error","total"]).to_csv("out/oracle_stage2_grid.csv",index=False)
+
+          # Stage 3: test threshold/operator conventions without touching option outcomes.
+          stage3=[]
+          rets={"ret4":u.close.pct_change(4),"ret5":u.close.pct_change(5),"ret6":u.close.pct_change(6)}
+          thresholds=[-.01,-.0125,-.015,-.0175,-.02,-.0225,-.025,-.03]
+          vols={"below_prior20":u.volume<u.vol20_prior,"above_prior20":u.volume>u.vol20_prior,"none":pd.Series(True,index=u.index)}
+          mas={"above200":u.close>u.ma200,"none":pd.Series(True,index=u.index)}
+          for rn,rv in rets.items():
+            for th in thresholds:
+              for vn,vc in vols.items():
+                for mn,mc in mas.items():
+                  z=u.loc[(rv<=th)&vc&mc,["date"]].copy()
+                  z["period"]=np.select([z.date.dt.year<=2016,z.date.dt.year<=2021],["2000-2016","2017-2021"],default="2022-2025")
+                  c=z.groupby("period").size(); a=int(c.get("2000-2016",0)); b=int(c.get("2017-2021",0)); h=int(c.get("2022-2025",0))
+                  stage3.append({"return_def":rn,"threshold":th,"volume":vn,"ma":mn,"discovery":a,"validation":b,"holdout":h,"total":len(z),"fingerprint_error":abs(a-107)+abs(b-55)+abs(h-18)})
+          pd.DataFrame(stage3).sort_values(["fingerprint_error","total"]).to_csv("out/oracle_stage3_grid.csv",index=False)
           # Audit the signal reconstruction before interpreting option outcomes.
           # Export every underlying signal and counts by research split/year.
           aud=u.loc[u.signal,["date","close","volume","ma200","vol20_prior","ret5"]].copy()
