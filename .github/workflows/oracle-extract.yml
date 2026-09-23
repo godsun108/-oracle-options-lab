@@ -99,7 +99,29 @@ jobs:
                   mean=float(vals.mean()); sd=float(vals.std(ddof=1)); se=sd/np.sqrt(len(vals)) if sd>0 else np.nan
                   t=mean/se if se and np.isfinite(se) else np.nan
                   research.append({"periods":p,"threshold":th,"volume":vname,"horizon":h,"n":len(vals),"win_rate":float((vals>0).mean()),"mean_return":mean,"median_return":float(vals.median()),"t_stat":t})
-          pd.DataFrame(research).sort_values(["t_stat","n"],ascending=[False,False]).to_csv("out/oracle_stage7_discovery_only.csv",index=False)
+          research_df=pd.DataFrame(research).sort_values(["t_stat","n"],ascending=[False,False])
+          research_df.to_csv("out/oracle_stage7_discovery_only.csv",index=False)
+
+          # Stage 8: preregister a compact family from discovery, then evaluate unchanged
+          # on validation and locked holdout. Candidates are chosen only from discovery results.
+          # Use top distinct rule families to reduce multiple-testing/cherry-picking risk.
+          cand=research_df.drop_duplicates(["periods","threshold","volume","horizon"]).head(12).copy()
+          eval_rows=[]
+          for _,c in cand.iterrows():
+            p=int(c.periods); th=float(c.threshold); vol=str(c.volume); h=int(c.horizon)
+            rr=u.close.pct_change(p)
+            vc=(u.volume<u.vol20_prior) if vol=="below" else ((u.volume>u.vol20_prior) if vol=="above" else pd.Series(True,index=u.index))
+            mask=(rr<=th)&(u.close>u.ma200)&vc
+            for period_name,pmask in [
+              ("discovery",u.date.dt.year<=2016),
+              ("validation",(u.date.dt.year>=2017)&(u.date.dt.year<=2021)),
+              ("holdout",(u.date.dt.year>=2022)&(u.date<=pd.Timestamp("2025-08-29")))]:
+              vals=u.loc[mask&pmask,f"fwd{h}"].dropna()
+              eval_rows.append({"periods":p,"threshold":th,"volume":vol,"horizon":h,"sample":period_name,
+                "n":len(vals),"win_rate":float((vals>0).mean()) if len(vals) else np.nan,
+                "mean_return":float(vals.mean()) if len(vals) else np.nan,
+                "median_return":float(vals.median()) if len(vals) else np.nan})
+          pd.DataFrame(eval_rows).to_csv("out/oracle_stage8_validation.csv",index=False)
 
           # Stage 3: test threshold/operator conventions without touching option outcomes.
           stage3=[]
