@@ -1,45 +1,100 @@
 name: Oracle Options Extract
 on:
   push:
-    paths:
-      - '.github/workflows/oracle-extract.yml'
+    paths: ['.github/workflows/oracle-extract.yml']
   workflow_dispatch:
 
 jobs:
-  extract:
+  backtest:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - name: Checkout lab
-        uses: actions/checkout@v4
-
-      - name: Install Python dependencies
-        run: python -m pip install --upgrade pandas pyarrow requests
-
-      - name: Extract SPY option rows
+      - uses: actions/checkout@v4
+      - run: python -m pip install --upgrade pandas pyarrow requests numpy
+      - name: Run frozen Oracle II O1-O6 EOD backtest
         shell: bash
         run: |
-          cat > /tmp/extract.py <<'PY'
-          import io, os, requests, pandas as pd
-          from datetime import timedelta
+          cat > /tmp/oracle.py <<'PY'
+          import io, os, requests, pandas as pd, numpy as np
+          BASE="https://raw.githubusercontent.com/anahatsingh-ui/options-dataset-hist/main/spy/options_{}.parquet"
+          U="https://raw.githubusercontent.com/OStochastic/Daily-SPY-data-from-2000-2025/main/spy_data.csv"
+          os.makedirs("out",exist_ok=True)
 
-          # Oracle II signal dates frozen from the underlying study will be supplied
-          # in signals.csv when available. For the first run, prove end-to-end binary
-          # access by extracting a compact 2024 sample and schema.
-          url="https://raw.githubusercontent.com/anahatsingh-ui/options-dataset-hist/main/spy/options_2024.parquet"
-          r=requests.get(url, timeout=120)
-          r.raise_for_status()
-          df=pd.read_parquet(io.BytesIO(r.content))
-          os.makedirs("out", exist_ok=True)
-          df.head(5000).to_csv("out/spy_options_2024_sample.csv", index=False)
-          pd.DataFrame({"column":df.columns.astype(str),"dtype":[str(x) for x in df.dtypes]}).to_csv("out/schema.csv", index=False)
-          with open("out/status.txt","w") as f:
-              f.write(f"rows={len(df)}\ncolumns={len(df.columns)}\nbytes_downloaded={len(r.content)}\n")
+          # Underlying signal: Oracle II Candidate #1, frozen before option outcomes.
+          u=pd.read_csv(io.StringIO(requests.get(U,timeout=60).text),skiprows=[1,2])
+          u.columns=["date","close","high","low","open","volume"]
+          u["date"]=pd.to_datetime(u.date); u=u.sort_values("date").reset_index(drop=True)
+          u["ma200"]=u.close.rolling(200).mean()
+          u["vol20_prior"]=u.volume.shift(1).rolling(20).mean()
+          u["ret5"]=u.close.pct_change(5)
+          u["signal"]=(u.ret5<=-.02)&(u.close>u.ma200)&(u.volume<u.vol20_prior)
+          sigidx=u.index[u.signal]
+          trades=[]
+          for i in sigidx:
+              if i+2>=len(u): continue
+              sd,ed,xd=u.loc[i,"date"],u.loc[i+1,"date"],u.loc[i+2,"date"]
+              if ed.year<2008 or ed>pd.Timestamp("2025-08-29"): continue
+              trades.append((sd,ed,xd,float(u.loc[i,"close"]),float(u.loc[i+1,"close"]),float(u.loc[i+2,"close"])))
+          t=pd.DataFrame(trades,columns=["signal_date","entry_date","exit_date","signal_close","entry_underlying_close","exit_underlying_close"])
+          t.to_csv("out/oracle_signal_schedule.csv",index=False)
+
+          years=sorted(set(t.entry_date.dt.year)|set(t.exit_date.dt.year))
+          chains={}
+          for y in years:
+              r=requests.get(BASE.format(y),timeout=180); r.raise_for_status()
+              d=pd.read_parquet(io.BytesIO(r.content))
+              d["date"]=pd.to_datetime(d.date); d["expiration"]=pd.to_datetime(d.expiration)
+              d=d[d["date"].isin(set(t.entry_date)|set(t.exit_date))].copy()
+              chains[y]=d
+          allc=pd.concat(chains.values(),ignore_index=True)
+
+          specs=[
+            ("O1_ATM_2_3DTE",.50,2,3),("O2_D40_2_3DTE",.40,2,3),("O3_D25_2_3DTE",.25,2,3),
+            ("O4_ATM_7_10DTE",.50,7,10),("O5_D40_7_10DTE",.40,7,10),("O6_D25_7_10DTE",.25,7,10)]
+          rows=[]
+          for tr in t.itertuples(index=False):
+              ent=allc[(allc.date==tr.entry_date)&(allc.type=="call")].copy()
+              for name,target,lo,hi in specs:
+                  q=ent.copy(); q["dte"]=(q.expiration-q.date).dt.days
+                  q=q[(q.dte>=lo)&(q.dte<=hi)&q.delta.notna()&(q.ask>0)]
+                  if q.empty:
+                      rows.append({**tr._asdict(),"spec":name,"status":"no_entry_contract"}); continue
+                  q["dist"]=(q.delta-target).abs()
+                  e=q.sort_values(["dist","ask"]).iloc[0]
+                  ex=allc[(allc.date==tr.exit_date)&(allc.contract_id==e.contract_id)]
+                  if ex.empty or not np.isfinite(ex.iloc[0].bid):
+                      rows.append({**tr._asdict(),"spec":name,"status":"no_exit_quote","contract_id":e.contract_id}); continue
+                  x=ex.iloc[0]; entry=float(e.ask); exitp=float(x.bid)
+                  ret=exitp/entry-1 if entry>0 else np.nan
+                  rows.append({**tr._asdict(),"spec":name,"status":"ok","contract_id":e.contract_id,
+                    "expiration":e.expiration,"strike":e.strike,"entry_delta":e.delta,"entry_bid":e.bid,"entry_ask":entry,
+                    "exit_bid":exitp,"exit_ask":x.ask,"option_return":ret,
+                    "underlying_return_entry_to_exit":tr.exit_underlying_close/tr.entry_underlying_close-1})
+          r=pd.DataFrame(rows); r.to_csv("out/oracle_o1_o6_trades.csv",index=False)
+          ok=r[r.status=="ok"].copy()
+          if len(ok):
+              ok["period"]=np.select([ok.entry_date.dt.year<=2016,ok.entry_date.dt.year<=2021],
+                                     ["2008-2016","2017-2021"],default="2022-2025")
+              def stats(g):
+                  rr=g.option_return.dropna()
+                  wealth=(1+rr).cumprod(); dd=wealth/wealth.cummax()-1
+                  return pd.Series({"n":len(rr),"win_rate":(rr>0).mean(),"mean_return":rr.mean(),"median_return":rr.median(),
+                    "avg_winner":rr[rr>0].mean(),"avg_loser":rr[rr<=0].mean(),"best":rr.max(),"worst":rr.min(),
+                    "compound_return":wealth.iloc[-1]-1 if len(wealth) else np.nan,"max_drawdown":dd.min() if len(dd) else np.nan,
+                    "mean_underlying_return":g.underlying_return_entry_to_exit.mean()})
+              summary=pd.concat([
+                ok.groupby(["spec","period"],sort=False).apply(stats,include_groups=False).reset_index(),
+                ok.groupby("spec",sort=False).apply(stats,include_groups=False).reset_index().assign(period="FULL")
+              ],ignore_index=True)
+              summary.to_csv("out/oracle_o1_o6_summary.csv",index=False)
+          with open("out/README.txt","w") as f:
+              f.write("FROZEN EXECUTION: signal at T0 close; enter T+1 EOD at ask; exit T+2 EOD at bid.\n")
+              f.write("O1/O4 ATM operationalized as call delta closest to 0.50; O2/O5 closest 0.40; O3/O6 closest 0.25.\n")
+              f.write("DTE is calendar days at entry. No rules changed after option outcomes.\n")
           PY
-          python /tmp/extract.py
-
-      - name: Upload Oracle artifact
-        uses: actions/upload-artifact@v4
+          python /tmp/oracle.py
+      - uses: actions/upload-artifact@v4
         with:
-          name: oracle-spy-options
+          name: oracle-o1-o6-results
           path: out/
           retention-days: 7
