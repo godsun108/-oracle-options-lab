@@ -1,0 +1,45 @@
+name: Oracle Options Extract
+on:
+  push:
+    paths:
+      - '.github/workflows/oracle-extract.yml'
+  workflow_dispatch:
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout lab
+        uses: actions/checkout@v4
+
+      - name: Install Python dependencies
+        run: python -m pip install --upgrade pandas pyarrow requests
+
+      - name: Extract SPY option rows
+        shell: bash
+        run: |
+          cat > /tmp/extract.py <<'PY'
+          import io, os, requests, pandas as pd
+          from datetime import timedelta
+
+          # Oracle II signal dates frozen from the underlying study will be supplied
+          # in signals.csv when available. For the first run, prove end-to-end binary
+          # access by extracting a compact 2024 sample and schema.
+          url="https://raw.githubusercontent.com/anahatsingh-ui/options-dataset-hist/main/spy/options_2024.parquet"
+          r=requests.get(url, timeout=120)
+          r.raise_for_status()
+          df=pd.read_parquet(io.BytesIO(r.content))
+          os.makedirs("out", exist_ok=True)
+          df.head(5000).to_csv("out/spy_options_2024_sample.csv", index=False)
+          pd.DataFrame({"column":df.columns.astype(str),"dtype":[str(x) for x in df.dtypes]}).to_csv("out/schema.csv", index=False)
+          with open("out/status.txt","w") as f:
+              f.write(f"rows={len(df)}\ncolumns={len(df.columns)}\nbytes_downloaded={len(r.content)}\n")
+          PY
+          python /tmp/extract.py
+
+      - name: Upload Oracle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: oracle-spy-options
+          path: out/
+          retention-days: 7
