@@ -204,7 +204,7 @@ jobs:
           # Options: signal T0 close; enter T+1 EOD ask; exit T+2 EOD bid.
           u["stage9_signal"]=(u.close.pct_change(6)<=-.01)&(u.close>u.ma200)
           aud=u.loc[u.stage9_signal,["date","close","volume","ma200"]].copy()
-          aud["ret6"]=u.loc[u.stage9_signal].close.pct_change(6)
+          aud["ret6"]=u.close.pct_change(6).loc[u.stage9_signal]
           aud["period"]=np.select([aud.date.dt.year<=2016,aud.date.dt.year<=2021],["2000-2016","2017-2021"],default="2022-2025")
           aud.to_csv("out/oracle_stage9_signals.csv",index=False)
 
@@ -284,7 +284,7 @@ jobs:
               ok["period"]=np.select([ok.entry_date.dt.year<=2016,ok.entry_date.dt.year<=2021],["2008-2016","2017-2021"],default="2022-2025")
               def stat(g):
                   rr=g.option_return; pp=g.one_contract_pnl
-                  cum=pp.cumsum(); peak=cum.cummax(); dd=cum-peak
+                  cum=pp.cumsum(); peak=np.maximum.accumulate(np.r_[0.0,cum.to_numpy()]); dd=cum.to_numpy()-peak[1:]
                   return pd.Series({"n_eligible":len(g),"win_rate":float((pp>0).mean()),"mean_return":rr.mean(),"median_return":rr.median(),
                     "avg_winner":rr[pp>0].mean(),"avg_loser":rr[pp<=0].mean(),"best_return":rr.max(),"worst_return":rr.min(),
                     "total_one_contract_pnl":pp.sum(),"max_drawdown_dollars":dd.min() if len(dd) else np.nan})
