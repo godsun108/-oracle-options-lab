@@ -91,6 +91,22 @@ jobs:
                   c=z.groupby("period").size(); a=int(c.get("2000-2016",0)); b=int(c.get("2017-2021",0)); h=int(c.get("2022-2025",0))
                   stage3.append({"return_def":rn,"threshold":th,"volume":vn,"ma":mn,"discovery":a,"validation":b,"holdout":h,"total":len(z),"fingerprint_error":abs(a-107)+abs(b-55)+abs(h-18)})
           pd.DataFrame(stage3).sort_values(["fingerprint_error","total"]).to_csv("out/oracle_stage3_grid.csv",index=False)
+          # Stage 4: refine around the best Stage-3 family WITHOUT using option outcomes.
+          # Target is only the documented 107/55/18 signal-count fingerprint.
+          stage4=[]
+          for n in range(3,9):
+            rr=u.close.pct_change(n)
+            for th in np.arange(-0.035,-0.0149,0.0005):
+              for volname,vc in {"above_prior20":u.volume>u.vol20_prior,"below_prior20":u.volume<u.vol20_prior,"none":pd.Series(True,index=u.index)}.items():
+                for maname,mc in {"above200":u.close>u.ma200,"above200prior":u.close>u.ma200_prior}.items():
+                  z=u.loc[(rr<=th)&vc&mc,["date"]].copy()
+                  z["period"]=np.select([z.date.dt.year<=2016,z.date.dt.year<=2021],["2000-2016","2017-2021"],default="2022-2025")
+                  c=z.groupby("period").size()
+                  d0,d1,d2=int(c.get("2000-2016",0)),int(c.get("2017-2021",0)),int(c.get("2022-2025",0))
+                  stage4.append({"periods":n,"threshold":round(float(th),4),"volume":volname,"ma":maname,
+                    "discovery":d0,"validation":d1,"holdout":d2,"total":len(z),
+                    "fingerprint_error":abs(d0-107)+abs(d1-55)+abs(d2-18)})
+          pd.DataFrame(stage4).sort_values(["fingerprint_error","total"]).to_csv("out/oracle_stage4_grid.csv",index=False)
           # Audit the signal reconstruction before interpreting option outcomes.
           # Export every underlying signal and counts by research split/year.
           aud=u.loc[u.signal,["date","close","volume","ma200","vol20_prior","ret5"]].copy()
