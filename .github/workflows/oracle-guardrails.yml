@@ -1,0 +1,20 @@
+name: Oracle Guardrails
+on:
+  push:
+    paths:
+      - 'oracle_q/**'
+      - 'tests/test_self_repair.py'
+      - '.github/workflows/oracle-guardrails.yml'
+  pull_request:
+    paths:
+      - 'oracle_q/**'
+jobs:
+  guardrails:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install pytest numpy pandas
+      - run: pytest -q tests/test_self_repair.py
