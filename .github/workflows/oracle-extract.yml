@@ -28,6 +28,13 @@ jobs:
           u["vol20_prior"]=u.volume.shift(1).rolling(20).mean()
           u["ret5"]=u.close.pct_change(5)
           u["signal"]=(u.ret5<=-.02)&(u.close>u.ma200)&(u.volume<u.vol20_prior)
+          # Audit the signal reconstruction before interpreting option outcomes.
+          # Export every underlying signal and counts by research split/year.
+          aud=u.loc[u.signal,["date","close","volume","ma200","vol20_prior","ret5"]].copy()
+          aud["period"]=np.select([aud.date.dt.year<=2016,aud.date.dt.year<=2021],["2000-2016","2017-2021"],default="2022-2025")
+          aud.to_csv("out/oracle_all_underlying_signals.csv",index=False)
+          aud.groupby("period").size().rename("n").reset_index().to_csv("out/oracle_signal_counts_by_period.csv",index=False)
+          aud.assign(year=aud.date.dt.year).groupby("year").size().rename("n").reset_index().to_csv("out/oracle_signal_counts_by_year.csv",index=False)
           sigidx=u.index[u.signal]
           trades=[]
           for i in sigidx:
