@@ -107,6 +107,28 @@ jobs:
                     "discovery":d0,"validation":d1,"holdout":d2,"total":len(z),
                     "fingerprint_error":abs(d0-107)+abs(d1-55)+abs(d2-18)})
           pd.DataFrame(stage4).sort_values(["fingerprint_error","total"]).to_csv("out/oracle_stage4_grid.csv",index=False)
+
+          # Stage 5: test whether the historical fingerprint used NON-overlapping event episodes
+          # rather than counting every qualifying day in a multi-day cluster.
+          stage5=[]
+          target=(107,55,18)
+          for periods in range(3,9):
+            rr=u.close/u.close.shift(periods)-1
+            for thr in np.arange(-.035,-.0099,.0005):
+              raw=(rr<=thr)&(u.close>u.ma200)&(u.volume>u.vol20_prior)
+              idx=np.flatnonzero(raw.fillna(False).to_numpy())
+              for cooldown in range(0,11):
+                keep=[]; last=-999
+                for i in idx:
+                  if i-last>cooldown:
+                    keep.append(i); last=i
+                z=u.iloc[keep][["date"]].copy()
+                z["period"]=np.select([z.date.dt.year<=2016,z.date.dt.year<=2021],["2000-2016","2017-2021"],default="2022-2025")
+                c=z.groupby("period").size()
+                vals=(int(c.get("2000-2016",0)),int(c.get("2017-2021",0)),int(c.get("2022-2025",0)))
+                err=sum(abs(a-b) for a,b in zip(vals,target))
+                stage5.append({"periods":periods,"threshold":round(float(thr),4),"cooldown_sessions":cooldown,"discovery":vals[0],"validation":vals[1],"holdout":vals[2],"total":sum(vals),"fingerprint_error":err})
+          pd.DataFrame(stage5).sort_values(["fingerprint_error","total"]).to_csv("out/oracle_stage5_episode_grid.csv",index=False)
           # Audit the signal reconstruction before interpreting option outcomes.
           # Export every underlying signal and counts by research split/year.
           aud=u.loc[u.signal,["date","close","volume","ma200","vol20_prior","ret5"]].copy()
