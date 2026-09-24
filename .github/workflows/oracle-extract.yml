@@ -375,6 +375,46 @@ jobs:
           if len(abdf):
               abdf.sort_values(["spec","delta_brier","feature_set","l2"]).groupby("spec",as_index=False).first().to_csv(
                   "out/oracle_regime_ablation_best_by_spec.csv",index=False)
+
+          # Stage 11: robustness check for the first Stage-10 pass.
+          # Freeze O4 + trend + L2=30 BEFORE looking at these diagnostics.
+          # Test stability across calendar subperiods and leave-one-trend-feature-out variants.
+          lead_spec="O4_ATM_7_10DTE"
+          lead_features=["ret_5","ret_20","dist_ma20","dist_ma50","dist_ma200"]
+          lead_l2=30.0
+          g=t[t.spec==lead_spec].copy()
+          robust=[]
+          if len(g):
+              z=g.merge(feat[["date"]+lead_features],left_on="signal_date",right_on="date",how="left")
+              pred=walk_forward_predict(z,lead_features,"target",date_col="signal_date",min_train=100,l2=lead_l2)
+              ev=z[["signal_date","target"]].merge(pred,on="signal_date",how="inner")
+              ev["signal_date"]=pd.to_datetime(ev.signal_date)
+              ev["period"]=np.select(
+                  [ev.signal_date.dt.year<=2016,ev.signal_date.dt.year<=2021],
+                  ["2008-2016","2017-2021"],default="2022-2025")
+              for period,gg in list(ev.groupby("period"))+[("FULL",ev)]:
+                  if len(gg):
+                      bm=brier(gg.target,gg.p_model); bu=brier(gg.target,gg.p_unconditional)
+                      robust.append({"test":"frozen_lead_by_period","variant":"trend_l2_30",
+                          "period":period,"n":len(gg),"brier_model":bm,
+                          "brier_unconditional":bu,"delta_brier":bm-bu})
+              # Sensitivity only: remove one trend feature at a time. This does not redefine the lead.
+              for dropped in lead_features:
+                  ff=[x for x in lead_features if x!=dropped]
+                  zz=g.merge(feat[["date"]+ff],left_on="signal_date",right_on="date",how="left")
+                  pp=walk_forward_predict(zz,ff,"target",date_col="signal_date",min_train=100,l2=lead_l2)
+                  if pp.empty: continue
+                  ee=zz[["signal_date","target"]].merge(pp,on="signal_date",how="inner")
+                  bm=brier(ee.target,ee.p_model); bu=brier(ee.target,ee.p_unconditional)
+                  robust.append({"test":"leave_one_feature_out","variant":"drop_"+dropped,
+                      "period":"FULL","n":len(ee),"brier_model":bm,
+                      "brier_unconditional":bu,"delta_brier":bm-bu})
+              ev.to_csv("out/oracle_stage11_o4_frozen_predictions.csv",index=False)
+          pd.DataFrame(robust).to_csv("out/oracle_stage11_o4_robustness.csv",index=False)
+          with open("out/STAGE11_README.txt","w") as fh:
+              fh.write("Stage 11 freezes the Stage-10 lead BEFORE robustness checks: O4 ATM 7-10DTE, trend features, L2=30.\\n")
+              fh.write("Primary diagnostic: calendar-subperiod Brier delta versus the same expanding unconditional baseline.\\n")
+              fh.write("Sensitivity diagnostic: leave one trend feature out at a time. Stage-9 execution rules remain unchanged.\\n")
           PY
           python /tmp/oracle_regime.py
 
