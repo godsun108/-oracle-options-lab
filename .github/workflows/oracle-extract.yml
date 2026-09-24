@@ -348,6 +348,33 @@ jobs:
                     "brier_unconditional":brier(g.target,g.p_unconditional),
                     "delta_brier":brier(g.target,g.p_model)-brier(g.target,g.p_unconditional)})
           pd.DataFrame(summary).to_csv("out/oracle_regime_walkforward_summary.csv",index=False)
+
+          # Stage 10: preregister a compact regime ablation/regularization benchmark.
+          # Keep Stage-9 trades frozen; only compare probability models out of sample.
+          feature_sets={
+              "full":cols,
+              "trend":["ret_5","ret_20","dist_ma20","dist_ma50","dist_ma200"],
+              "volatility":["rv10","rv20","rv60","vol_ratio_10_60"],
+              "compact":["ret_20","dist_ma200","rv20","vol_ratio_10_60"],
+          }
+          if "volume_ratio20" in cols:
+              feature_sets["full_plus_volume"]=cols
+          ab=[]
+          for spec,g in t.groupby("spec"):
+              for set_name,fcols in feature_sets.items():
+                  z=g.merge(feat[["date"]+fcols],left_on="signal_date",right_on="date",how="left")
+                  for l2 in [1.0,3.0,10.0,30.0]:
+                      pred=walk_forward_predict(z,fcols,"target",date_col="signal_date",min_train=100,l2=l2)
+                      if pred.empty: continue
+                      ev=z[["signal_date","target"]].merge(pred,on="signal_date",how="inner")
+                      bm=brier(ev.target,ev.p_model); bu=brier(ev.target,ev.p_unconditional)
+                      ab.append({"spec":spec,"feature_set":set_name,"l2":l2,"n":len(ev),
+                                 "brier_model":bm,"brier_unconditional":bu,"delta_brier":bm-bu})
+          abdf=pd.DataFrame(ab)
+          abdf.to_csv("out/oracle_regime_ablation_summary.csv",index=False)
+          if len(abdf):
+              abdf.sort_values(["spec","delta_brier","feature_set","l2"]).groupby("spec",as_index=False).first().to_csv(
+                  "out/oracle_regime_ablation_best_by_spec.csv",index=False)
           PY
           python /tmp/oracle_regime.py
 
