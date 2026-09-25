@@ -3,7 +3,7 @@ on:
   push:
     paths:
       - 'oracle_q/**'
-      - 'tests/test_self_repair.py'
+      - 'tests/**'
       - '.github/workflows/oracle-guardrails.yml'
   pull_request:
     paths:
@@ -17,4 +17,4 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m pip install pytest numpy pandas
-      - run: pytest -q tests/test_self_repair.py
+      - run: pytest -q tests
