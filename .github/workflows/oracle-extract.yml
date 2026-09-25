@@ -415,6 +415,52 @@ jobs:
               fh.write("Stage 11 freezes the Stage-10 lead BEFORE robustness checks: O4 ATM 7-10DTE, trend features, L2=30.\\n")
               fh.write("Primary diagnostic: calendar-subperiod Brier delta versus the same expanding unconditional baseline.\\n")
               fh.write("Sensitivity diagnostic: leave one trend feature out at a time. Stage-9 execution rules remain unchanged.\\n")
+          # Stage 12: forensic reconstruction audit.
+          # The historical 107/55/18 count fingerprint is NOT treated as ground truth.
+          # No original code or signal-date artifact has been recovered, so this stage
+          # asks only whether any already-tested reconstruction reproduces it exactly.
+          target={"discovery":107,"validation":55,"holdout":18}
+          sources=[
+              ("stage2","out/oracle_stage2_grid.csv"),
+              ("stage3","out/oracle_stage3_grid.csv"),
+              ("stage4","out/oracle_stage4_grid.csv"),
+              ("stage5","out/oracle_stage5_episode_grid.csv"),
+              ("stage6","out/oracle_stage6_episode_grid.csv"),
+          ]
+          forensic=[]
+          exact=[]
+          for source,path in sources:
+              d=pd.read_csv(path)
+              for col,val in target.items():
+                  if col not in d.columns:
+                      raise ValueError(f"{source} missing {col}")
+              d["recomputed_error"]=sum((d[k]-v).abs() for k,v in target.items())
+              best=d.sort_values(["recomputed_error","total"]).head(5).copy()
+              for rank,(_,r) in enumerate(best.iterrows(),1):
+                  row={"source":source,"rank":rank,
+                       "discovery":int(r.discovery),"validation":int(r.validation),
+                       "holdout":int(r.holdout),"total":int(r.total),
+                       "fingerprint_error":int(r.recomputed_error)}
+                  # Preserve the rule-defining columns without assuming a common schema.
+                  for k in ["price","return_def","periods","threshold","volume","ma",
+                            "cooldown_sessions","episode_gap"]:
+                      if k in r.index and pd.notna(r[k]): row[k]=r[k]
+                  forensic.append(row)
+              ex=d[d.recomputed_error==0]
+              if len(ex):
+                  exact.append((source,len(ex)))
+          fdf=pd.DataFrame(forensic)
+          fdf.to_csv("out/oracle_stage12_reconstruction_audit.csv",index=False)
+          with open("out/STAGE12_README.txt","w") as fh:
+              fh.write("Stage 12 is a provenance/forensic audit, not another model search.\\n")
+              fh.write("Historical fingerprint under audit: 107/55/18 = 180 signals.\\n")
+              if exact:
+                  fh.write("Exact reconstruction(s) found in prior preregistered grids: "+str(exact)+"\\n")
+                  fh.write("An exact count match is necessary but NOT sufficient to establish provenance; signal dates must also be verified against an original artifact.\\n")
+              else:
+                  fh.write("No exact 107/55/18 reconstruction exists in Stages 2-6 grids.\\n")
+                  fh.write("Therefore the 180-signal fingerprint remains unverified historical metadata and must not be used as a tuning target.\\n")
+              fh.write("The frozen Stage-9 execution engine and Stage-11 robustness result are unchanged.\\n")
           PY
           python /tmp/oracle_regime.py
 
