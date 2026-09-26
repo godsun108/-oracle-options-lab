@@ -1,4 +1,5 @@
 name: Oracle Options Extract
+# benchmark-trigger: unified-options-edge-gate-v1
 on:
   push:
     paths: ['.github/workflows/oracle-extract.yml']
