@@ -464,6 +464,11 @@ jobs:
           PY
           python /tmp/oracle_regime.py
 
+      - name: Run realized-options proof-of-edge gate
+        run: |
+          python -m oracle_q.options_edge_gate out/oracle_stage9_options_trades.csv > out/oracle_options_edge_gate.json
+          cat out/oracle_options_edge_gate.json
+
       - uses: actions/upload-artifact@v4
         with:
           name: oracle-o1-o6-results
