@@ -13,10 +13,12 @@ jobs:
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
-        with:
-          repository: godsun108/Seldon
-          path: ../Seldon
+      - name: Fetch frozen Seldon implementation
+        run: |
+          mkdir -p ../Seldon/experiments ../Seldon/seldon
+          curl -fsSL https://raw.githubusercontent.com/godsun108/Seldon/main/experiments/fred_macro_004.py -o ../Seldon/experiments/fred_macro_004.py
+          curl -fsSL https://raw.githubusercontent.com/godsun108/Seldon/main/seldon/fred.py -o ../Seldon/seldon/fred.py
+          touch ../Seldon/experiments/__init__.py ../Seldon/seldon/__init__.py
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
