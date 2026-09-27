@@ -23,7 +23,7 @@ jobs:
       - env:
           GH_TOKEN: ${{ github.token }}
         run: gh run download 36353708837 -R godsun108/Seldon -n seldon-experiment-004 -D seldon_artifact
-      - run: python experiments/oracle_q_dollar_ev_002.py
+      - run: python -m experiments.oracle_q_dollar_ev_002
       - uses: actions/upload-artifact@v4
         with:
           name: oracle-q-dollar-ev-002
