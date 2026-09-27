@@ -14,13 +14,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: {python-version: "3.11"}
+        with:\n          python-version: "3.11"
       - run: python -m pip install --upgrade pandas numpy scipy scikit-learn
       - name: Download frozen Oracle evidence
-        env: {GH_TOKEN: ${{ github.token }}}
+        env:\n          GH_TOKEN: ${{ github.token }}
         run: gh run download 36257234984 -n oracle-o1-o6-results -D oracle
       - name: Download canonical Seldon feature
-        env: {GH_TOKEN: ${{ github.token }}}
+        env:\n          GH_TOKEN: ${{ github.token }}
         run: gh run download 36353708837 -R godsun108/Seldon -n seldon-experiment-004 -D seldon_artifact
       - name: Execute price-aware experiment
         run: python experiments/oracle_seldon_fusion_004.py
