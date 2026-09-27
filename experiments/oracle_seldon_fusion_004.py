@@ -36,14 +36,20 @@ def econ(g,col):
             "total_one_contract_pnl":float(q.one_contract_pnl.sum()),"win_rate":float((r>0).mean()),
             "profit_factor":gp/gl if gl else None,"max_compounded_drawdown":dd}
 
-CONTRACT_FEATURES=["dte","entry_delta","spread_pct","premium_pct_spot","moneyness","log_open_interest"]\n\ndef main():
+CONTRACT_FEATURES=["dte","entry_delta","spread_pct","premium_pct_spot","moneyness","log_open_interest"]
+
+def main():
     tr=pd.read_csv("oracle/oracle_stage9_options_trades.csv")
     raw=pd.read_csv("https://raw.githubusercontent.com/OStochastic/Daily-SPY-data-from-2000-2025/main/spy_data.csv",skiprows=[1,2])
     raw.columns=["date","close","high","low","open","volume"]; raw.date=pd.to_datetime(raw.date)
     for c in ["close","volume"]:raw[c]=pd.to_numeric(raw[c])
     feat=build_regime_features(raw[["date","close","volume"]]); feat.date=pd.to_datetime(feat.date).dt.normalize()
     z=tr[(tr.status=="ok")&(tr.spec==SPEC)].copy(); z.signal_date=pd.to_datetime(z.signal_date).dt.normalize()
-    z["spread_pct"]=(pd.to_numeric(z.entry_ask)-pd.to_numeric(z.entry_bid))/pd.to_numeric(z.entry_ask)\n    z["premium_pct_spot"]=pd.to_numeric(z.entry_ask)/pd.to_numeric(z.entry_spot_unadjusted)\n    z["moneyness"]=pd.to_numeric(z.strike)/pd.to_numeric(z.entry_spot_unadjusted)-1\n    z["log_open_interest"]=np.log1p(pd.to_numeric(z.entry_open_interest))\n    z=z.merge(feat[["date"]+BASE_FEATURES],left_on="signal_date",right_on="date",how="left").sort_values("signal_date")
+    z["spread_pct"]=(pd.to_numeric(z.entry_ask)-pd.to_numeric(z.entry_bid))/pd.to_numeric(z.entry_ask)
+    z["premium_pct_spot"]=pd.to_numeric(z.entry_ask)/pd.to_numeric(z.entry_spot_unadjusted)
+    z["moneyness"]=pd.to_numeric(z.strike)/pd.to_numeric(z.entry_spot_unadjusted)-1
+    z["log_open_interest"]=np.log1p(pd.to_numeric(z.entry_open_interest))
+    z=z.merge(feat[["date"]+BASE_FEATURES],left_on="signal_date",right_on="date",how="left").sort_values("signal_date")
     macro=seldon_snapshots(); macro.macro_as_of=pd.to_datetime(macro.macro_as_of)
     z=pd.merge_asof(z.sort_values("signal_date"),macro.sort_values("macro_as_of"),left_on="signal_date",right_on="macro_as_of",direction="backward")
     if (z.macro_as_of>z.signal_date).fillna(False).any(): raise AssertionError("future macro leakage")
@@ -62,7 +68,8 @@ CONTRACT_FEATURES=["dte","entry_delta","spread_pct","premium_pct_spot","moneynes
     result={"schema":"oracle.seldon.fusion.004.v1","status":"RESEARCH_ONLY_BURNED_HISTORY","contract_features":CONTRACT_FEATURES,
             "summary":summary,"economic_diagnostic_2022_2025":{m+"_pred_ev_gt_0":econ(h,f"pred_ev_{m}") for m in ["base","macro","price","full"]},
             "promotion_boundary":"Historical diagnostic only. Any candidate requires a frozen genuinely future paper-forward test."}
-    Path("out").mkdir(exist_ok=True); Path("out/oracle_seldon_fusion_004.json").write_text(json.dumps(result,indent=2)+"\n")
+    Path("out").mkdir(exist_ok=True); Path("out/oracle_seldon_fusion_004.json").write_text(json.dumps(result,indent=2)+"
+")
     pd.DataFrame(summary).to_csv("out/oracle_seldon_fusion_004_summary.csv",index=False); q.to_csv("out/oracle_seldon_fusion_004_predictions.csv",index=False)
     print(json.dumps(result,indent=2))
 if __name__=="__main__":main()
