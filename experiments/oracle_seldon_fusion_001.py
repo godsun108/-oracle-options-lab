@@ -23,7 +23,7 @@ SELDON_REPO_RAW="https://raw.githubusercontent.com/godsun108/Seldon/main"
 
 def seldon_snapshots():
     # Import the exact Seldon implementation by checking out Seldon beside Oracle in CI.
-    sys.path.insert(0,"../Seldon")
+    sys.path.insert(0,os.path.abspath("../Seldon"))
     from experiments.fred_macro_004 import state,p_analogue
     cutoffs=[f"{y}-{m:02d}-{31 if m in (1,7,10) else 30:02d}" for y in range(2000,2026) for m in (1,4,7,10)]
     states=[]
