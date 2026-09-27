@@ -34,6 +34,26 @@ def exact_schedule(candidates,batch_size=8,redundancy_lambda=.35,complexity_gamm
         if u>best_u: best_u=u; best=idx
     return [candidates[i] for i in best],best_u
 
+
+def anneal_schedule(candidates,batch_size=8,redundancy_lambda=.35,complexity_gamma=.15,
+                    steps=25000,seed=108):
+    """Deterministic simulated annealing for larger fixed-cardinality menus."""
+    rng=np.random.default_rng(seed); n=len(candidates)
+    info,R,complexity=matrices(candidates)
+    def score(idx):
+        x=np.zeros(n); x[list(idx)]=1
+        return float(info@x-redundancy_lambda*(x@R@x)/2-complexity_gamma*(complexity@x))
+    cur=set(rng.choice(n,size=batch_size,replace=False).tolist()); cur_u=score(cur)
+    best=set(cur); best_u=cur_u
+    for k in range(steps):
+        inside=int(rng.choice(list(cur))); outside=int(rng.choice([i for i in range(n) if i not in cur]))
+        nxt=set(cur); nxt.remove(inside); nxt.add(outside); nxt_u=score(nxt)
+        temp=max(.002,1.0-k/steps)
+        if nxt_u>=cur_u or rng.random()<np.exp((nxt_u-cur_u)/temp):
+            cur,cur_u=nxt,nxt_u
+            if cur_u>best_u: best,best_u=set(cur),cur_u
+    return [candidates[i] for i in sorted(best)],best_u
+
 def qubo_for_scheduler(candidates,redundancy_lambda=.35,complexity_gamma=.15):
     info,R,complexity=matrices(candidates)
     Q=(redundancy_lambda/2)*R
