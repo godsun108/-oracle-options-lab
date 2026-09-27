@@ -27,7 +27,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh run download 36353234855 -R godsun108/Seldon -n seldon-experiment-004 -D seldon_artifact
+          gh run download 36353708837 -R godsun108/Seldon -n seldon-experiment-004 -D seldon_artifact
           test -f seldon_artifact/seldon_macro_feature_12m.json
       - name: Run preregistered fusion
         run: PYTHONPATH=. python experiments/oracle_seldon_fusion_001.py
