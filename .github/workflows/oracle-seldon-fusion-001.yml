@@ -13,12 +13,6 @@ jobs:
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
-      - name: Fetch frozen Seldon implementation
-        run: |
-          mkdir -p ../Seldon/experiments ../Seldon/seldon
-          curl -fsSL https://raw.githubusercontent.com/godsun108/Seldon/main/experiments/fred_macro_004.py -o ../Seldon/experiments/fred_macro_004.py
-          curl -fsSL https://raw.githubusercontent.com/godsun108/Seldon/main/seldon/fred.py -o ../Seldon/seldon/fred.py
-          touch ../Seldon/experiments/__init__.py ../Seldon/seldon/__init__.py
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -29,9 +23,13 @@ jobs:
         run: |
           gh run download 36257234984 -n oracle-o1-o6-results -D out
           test -f out/oracle_stage9_options_trades.csv
-      - name: Run preregistered fusion
+      - name: Download frozen Seldon feature artifact
         env:
-          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download 36353234855 -R godsun108/Seldon -n seldon-experiment-004 -D seldon_artifact
+          test -f seldon_artifact/seldon_macro_feature_12m.json
+      - name: Run preregistered fusion
         run: PYTHONPATH=. python experiments/oracle_seldon_fusion_001.py
       - uses: actions/upload-artifact@v4
         with:
