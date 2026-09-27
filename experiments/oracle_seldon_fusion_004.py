@@ -68,8 +68,7 @@ def main():
     result={"schema":"oracle.seldon.fusion.004.v1","status":"RESEARCH_ONLY_BURNED_HISTORY","contract_features":CONTRACT_FEATURES,
             "summary":summary,"economic_diagnostic_2022_2025":{m+"_pred_ev_gt_0":econ(h,f"pred_ev_{m}") for m in ["base","macro","price","full"]},
             "promotion_boundary":"Historical diagnostic only. Any candidate requires a frozen genuinely future paper-forward test."}
-    Path("out").mkdir(exist_ok=True); Path("out/oracle_seldon_fusion_004.json").write_text(json.dumps(result,indent=2)+"
-")
+    Path("out").mkdir(exist_ok=True); Path("out/oracle_seldon_fusion_004.json").write_text(json.dumps(result,indent=2)+chr(10))
     pd.DataFrame(summary).to_csv("out/oracle_seldon_fusion_004_summary.csv",index=False); q.to_csv("out/oracle_seldon_fusion_004_predictions.csv",index=False)
     print(json.dumps(result,indent=2))
 if __name__=="__main__":main()
