@@ -22,28 +22,10 @@ SPEC="O4_ATM_7_10DTE"; L2=30.0; MIN_TRAIN=100
 SELDON_REPO_RAW="https://raw.githubusercontent.com/godsun108/Seldon/main"
 
 def seldon_snapshots():
-    # Import the exact Seldon implementation by checking out Seldon beside Oracle in CI.
-    sys.path.insert(0,os.path.abspath("../Seldon"))
-    from experiments.fred_macro_004 import state,p_analogue
-    cutoffs=[f"{y}-{m:02d}-{31 if m in (1,7,10) else 30:02d}" for y in range(2000,2026) for m in (1,4,7,10)]
-    states=[]
-    for c in cutoffs:
-        try: states.append(state(c))
-        except Exception as e:
-            # Recent/future quarter ends may not yet be available.
-            print(f"skip Seldon cutoff {c}: {type(e).__name__}",file=sys.stderr)
-    key="outcome_12m"; steps=4
-    for i in range(len(states)-steps):
-        states[i][key]=int(states[i+steps]["unemployment"]>states[i]["unemployment"])
-    rows=[]
-    for i in range(12,len(states)):
-        train=[r for r in states[:i] if key in r]
-        if len(train)<7: continue
-        cur=states[i]
-        p=p_analogue(train,cur,key)
-        rows.append({"macro_as_of":cur["cutoff"],"seldon_p_unrate_higher_12m":p,
-                     "seldon_n_train":len(train),"seldon_vintage_safe":True})
-    return pd.DataFrame(rows)
+    payload=json.loads(Path("seldon_artifact/seldon_macro_feature_12m.json").read_text())
+    rows=payload["rows"]
+    out=pd.DataFrame(rows).rename(columns={"probability":"seldon_p_unrate_higher_12m","n_train":"seldon_n_train","vintage_safe":"seldon_vintage_safe"})
+    return out[["macro_as_of","seldon_p_unrate_higher_12m","seldon_n_train","seldon_vintage_safe"]]
 
 def score(ev):
     if ev.empty:return {"n":0}
