@@ -1,5 +1,7 @@
 """Fusion 003: payoff-aware expanding expected-value research."""
 from pathlib import Path
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import json, math
 import numpy as np, pandas as pd
 from experiments.oracle_seldon_fusion_001 import BASE_FEATURES, SPEC, L2, MIN_TRAIN, seldon_snapshots
