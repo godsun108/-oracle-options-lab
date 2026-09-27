@@ -1,0 +1,30 @@
+name: Oracle Q Dollar EV 002
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "experiments/oracle_q_dollar_ev_002.py"
+      - ".github/workflows/oracle-q-dollar-ev-002.yml"
+permissions:
+  contents: read
+  actions: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install pandas numpy scipy scikit-learn
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download 36257234984 -n oracle-o1-o6-results -D oracle
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download 36353708837 -R godsun108/Seldon -n seldon-experiment-004 -D seldon_artifact
+      - run: python experiments/oracle_q_dollar_ev_002.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: oracle-q-dollar-ev-002
+          path: out/oracle_q_dollar_ev_002.json
