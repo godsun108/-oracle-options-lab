@@ -1,0 +1,41 @@
+name: Oracle x Seldon Fusion 001
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "experiments/oracle_seldon_fusion_001.py"
+      - ".github/workflows/oracle-seldon-fusion-001.yml"
+permissions:
+  contents: read
+jobs:
+  fusion:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: godsun108/Seldon
+          path: ../Seldon
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install --upgrade pandas numpy pyarrow requests
+      - name: Download frozen Oracle benchmark artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download 36257234984 -n oracle-o1-o6-results -D out
+          test -f out/oracle_stage9_options_trades.csv
+      - name: Run preregistered fusion
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+        run: PYTHONPATH=. python experiments/oracle_seldon_fusion_001.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: oracle-seldon-fusion-001
+          path: |
+            out/oracle_seldon_fusion_001.json
+            out/oracle_seldon_fusion_001_summary.csv
+            out/oracle_seldon_fusion_001_predictions.csv
+          retention-days: 30
