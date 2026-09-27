@@ -53,9 +53,10 @@ def main():
     macro=seldon_snapshots(); macro.macro_as_of=pd.to_datetime(macro.macro_as_of)
     z=pd.merge_asof(z.sort_values("signal_date"),macro.sort_values("macro_as_of"),left_on="signal_date",right_on="macro_as_of",direction="backward")
     if (z.macro_as_of>z.signal_date).fillna(False).any(): raise AssertionError("future macro leakage")
-    base=ridge_walk(z,BASE_FEATURES).rename(columns={"pred_ev":"pred_ev_base"})
-    fused=ridge_walk(z,BASE_FEATURES+["seldon_p_unrate_higher_12m"]).rename(columns={"pred_ev":"pred_ev_fused"})
-    q=z[["signal_date","option_return","one_contract_pnl"]].merge(base,on="signal_date").merge(fused,on="signal_date")
+    models={"base":BASE_FEATURES,"macro":BASE_FEATURES+["seldon_p_unrate_higher_12m"],"price":BASE_FEATURES+CONTRACT_FEATURES,"full":BASE_FEATURES+["seldon_p_unrate_higher_12m"]+CONTRACT_FEATURES}
+    q=z[["signal_date","option_return","one_contract_pnl"]].copy()
+    for name,fs in models.items():
+        q=q.merge(ridge_walk(z,fs).rename(columns={"pred_ev":f"pred_ev_{name}"}),on="signal_date")
     periods={"2017-2021":q[(q.signal_date.dt.year>=2017)&(q.signal_date.dt.year<=2021)],
              "2022-2025":q[q.signal_date.dt.year>=2022],"FULL":q}
     summary=[]
