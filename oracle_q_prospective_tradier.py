@@ -14,5 +14,7 @@ if __name__=="__main__":
     provider=TradierOptionsProvider(token=os.getenv("TRADIER_PRODUCTION_TOKEN"),sandbox=False)
     minimum=date.fromisoformat(signal.signal_date)+timedelta(days=1)
     result=observe(provider,"SPY",signal.signal_date,signal.signal,signal.close,minimum)
-    print("ORACLE UNDERLYING",json.dumps(source,sort_keys=True))
-    print("ORACLE PROSPECTIVE",to_json(result))
+    envelope={"schema_version":"oracle-q-forward-evidence-v1","underlying_source":source,
+              "canonical_signal":signal.__dict__,"prospective_options":result.__dict__,
+              "orders_enabled":False,"research_only":True}
+    print("ORACLE FORWARD EVIDENCE",json.dumps(envelope,sort_keys=True,separators=(",",":")))
