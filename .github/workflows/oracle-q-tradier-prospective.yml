@@ -9,6 +9,7 @@ on:
       - "oracle_q/underlying_provider.py"
       - "oracle_q/seldon_sidecar.py"
       - "tests/test_seldon_sidecar.py"
+      - "tests/test_underlying_provider.py"
       - "oracle_q_prospective_tradier.py"
       - "tests/test_prospective_options.py"
       - ".github/workflows/oracle-q-tradier-prospective.yml"
