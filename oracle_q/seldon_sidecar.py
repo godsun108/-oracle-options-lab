@@ -14,5 +14,12 @@ def attach(payload,signal_date):
     raw=json.dumps(payload,sort_keys=True,separators=(",",":"))
     return {"state":"ATTACHED","payload":payload,"payload_sha256":hashlib.sha256(raw.encode()).hexdigest(),
             "research_only":True,"can_modify_oracle_signal":False}
-def unavailable():
-    return {"state":"MISSING","payload":None,"payload_sha256":None,"research_only":True,"can_modify_oracle_signal":False}
+def unavailable(state="MISSING"):
+    return {"state":state,"payload":None,"payload_sha256":None,"research_only":True,"can_modify_oracle_signal":False}
+
+def attach_if_eligible(payload,signal_date):
+    try:
+        return attach(payload,signal_date)
+    except ValueError as e:
+        if str(e)=="future Seldon leakage": return unavailable("INELIGIBLE_FUTURE")
+        raise
