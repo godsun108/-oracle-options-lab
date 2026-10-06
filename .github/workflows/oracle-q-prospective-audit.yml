@@ -1,0 +1,29 @@
+name: Oracle-Q Prospective Evidence Audit
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "prospective_records/**"
+      - "oracle_q/audit_prospective.py"
+      - "tests/test_audit_prospective.py"
+      - ".github/workflows/oracle-q-prospective-audit.yml"
+  schedule:
+    - cron: '15 23 * * 1-5'
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install pytest
+      - run: python -m pytest -q tests/test_audit_prospective.py tests/test_seldon_sidecar.py
+      - run: python -m oracle_q.audit_prospective
+      - uses: actions/upload-artifact@v4
+        with:
+          name: oracle-q-prospective-audit
+          path: out/prospective_audit.json
+          retention-days: 90
