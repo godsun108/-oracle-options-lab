@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - "oracle_q/prospective_options.py"
+      - "oracle_q/underlying_provider.py"
       - "oracle_q_prospective_tradier.py"
       - "tests/test_prospective_options.py"
       - ".github/workflows/oracle-q-tradier-prospective.yml"
@@ -19,7 +20,7 @@ jobs:
           python-version: "3.12"
       - run: python -m pip install pandas requests pytest
       - name: Unit guardrails
-        run: python -m pytest -q tests/test_options_provider.py tests/test_prospective_options.py
+        run: python -m pytest -q tests/test_options_provider.py tests/test_prospective_options.py tests/test_underlying_provider.py
       - name: Prospective read-only observation
         env:
           TRADIER_PRODUCTION_TOKEN: ${{ secrets.TRADIER_TOKEN }}
