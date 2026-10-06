@@ -4,7 +4,7 @@ import hashlib,json
 from datetime import date
 from pathlib import Path
 
-def audit_record(p:Path):
+def audit_record(p:Path, exclusions=None):
     x=json.loads(p.read_text()); errors=[]
     if x.get("schema_version")!="oracle-q-forward-evidence-v1": errors.append("schema")
     if x.get("orders_enabled") is not False: errors.append("orders_enabled")
@@ -23,15 +23,20 @@ def audit_record(p:Path):
             else:
                 raw=json.dumps(payload,sort_keys=True,separators=(",",":"))
                 if hashlib.sha256(raw.encode()).hexdigest()!=side.get("payload_sha256"): errors.append("seldon_hash")
+    excluded=(exclusions or {}).get(p.name)
     return {"file":p.name,"signal_date":sig.get("signal_date"),"signal":sig.get("signal"),
+            "admissible":not bool(excluded),"inadmissible_reason":excluded.get("reason") if excluded else None,
             "option_status":opt.get("status"),"seldon_state":side.get("state") if side else "LEGACY_NONE",
             "ok":not errors,"errors":errors}
 
 def main():
-    rows=[audit_record(p) for p in sorted(Path("prospective_records").glob("*.json"))]
+    registry=Path("prospective_records/admissibility.json")
+    exclusions=(json.loads(registry.read_text()).get("records",{}) if registry.exists() else {})
+    rows=[audit_record(p,exclusions) for p in sorted(Path("prospective_records").glob("*.json")) if p.name!="admissibility.json"]
     if not rows: raise SystemExit("prospective evidence ledger unexpectedly empty")
     out={"schema":"oracle-q-prospective-audit-v1","records":len(rows),"passed":sum(r["ok"] for r in rows),
-         "failed":sum(not r["ok"] for r in rows),"rows":rows}
+         "failed":sum(not r["ok"] for r in rows),"admissible":sum(r["ok"] and r["admissible"] for r in rows),
+         "inadmissible_preserved":sum(not r["admissible"] for r in rows),"rows":rows}
     Path("out").mkdir(exist_ok=True);Path("out/prospective_audit.json").write_text(json.dumps(out,indent=2)+"\n")
     print(json.dumps(out,sort_keys=True))
     if out["failed"]: raise SystemExit("prospective evidence audit failed")
