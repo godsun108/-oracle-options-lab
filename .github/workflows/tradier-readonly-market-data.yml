@@ -1,6 +1,10 @@
 name: Tradier Read-Only Market Data
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - "tradier_readonly_smoke.py"
+      - ".github/workflows/tradier-readonly-market-data.yml"
 jobs:
   smoke:
     runs-on: ubuntu-latest
