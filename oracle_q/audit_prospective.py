@@ -29,6 +29,7 @@ def audit_record(p:Path):
 
 def main():
     rows=[audit_record(p) for p in sorted(Path("prospective_records").glob("*.json"))]
+    if not rows: raise SystemExit("prospective evidence ledger unexpectedly empty")
     out={"schema":"oracle-q-prospective-audit-v1","records":len(rows),"passed":sum(r["ok"] for r in rows),
          "failed":sum(not r["ok"] for r in rows),"rows":rows}
     Path("out").mkdir(exist_ok=True);Path("out/prospective_audit.json").write_text(json.dumps(out,indent=2)+"\n")
