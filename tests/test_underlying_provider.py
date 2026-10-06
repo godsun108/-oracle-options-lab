@@ -5,6 +5,14 @@ class R:
     def raise_for_status(self): pass
     def json(self): return {"history":{"day":[
       {"date":"2026-10-02","close":1.5},{"date":"2026-10-05","close":2.5}]}}
+class FakeResponse:
+    def __init__(self,payload): self.payload=payload
+    def raise_for_status(self): pass
+    def json(self): return self.payload
+class FakeSession:
+    def __init__(self,payload): self.payload=payload
+    def get(self,url,params,headers,timeout): return FakeResponse(self.payload)
+
 class S:
     def get(self,url,params,headers,timeout):
         assert url.endswith("/markets/history")
