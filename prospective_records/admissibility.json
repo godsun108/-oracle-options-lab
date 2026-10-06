@@ -1,0 +1,10 @@
+{
+  "schema": "oracle-q-prospective-admissibility-v1",
+  "records": {
+    "2026-10-06.json": {
+      "admissible": false,
+      "reason": "Captured before the 16:15 ET completed-session policy was implemented; Tradier current-date daily bar may have been intraday/partial.",
+      "preserve_original": true
+    }
+  }
+}
