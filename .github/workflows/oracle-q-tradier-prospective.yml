@@ -1,6 +1,8 @@
 name: Oracle-Q Tradier Prospective Observation
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '45 22 * * 1-5'
   push:
     paths:
       - "oracle_q/prospective_options.py"
@@ -9,7 +11,7 @@ on:
       - "tests/test_prospective_options.py"
       - ".github/workflows/oracle-q-tradier-prospective.yml"
 permissions:
-  contents: read
+  contents: write
 jobs:
   observe:
     runs-on: ubuntu-latest
@@ -24,4 +26,24 @@ jobs:
       - name: Prospective read-only observation
         env:
           TRADIER_PRODUCTION_TOKEN: ${{ secrets.TRADIER_TOKEN }}
-        run: python oracle_q_prospective_tradier.py
+        run: |
+          mkdir -p prospective_records
+          python oracle_q_prospective_tradier.py | tee /tmp/evidence.log
+          sed 's/^ORACLE FORWARD EVIDENCE //' /tmp/evidence.log > /tmp/evidence.json
+          python -m json.tool /tmp/evidence.json >/dev/null
+          date="$(python -c 'import json; print(json.load(open("/tmp/evidence.json"))["canonical_signal"]["signal_date"])')"
+          path="prospective_records/$date.json"
+          if [ -e "$path" ]; then
+            echo "Prospective record already exists for $date; refusing silent overwrite."
+            diff -u "$path" /tmp/evidence.json || true
+            exit 0
+          fi
+          cp /tmp/evidence.json "$path"
+      - name: Commit immutable prospective evidence
+        run: |
+          if git diff --quiet -- prospective_records; then exit 0; fi
+          git config user.name "oracle-prospective-bot"
+          git config user.email "oracle-prospective-bot@users.noreply.github.com"
+          git add prospective_records
+          git commit -m "Prospective Oracle-Q evidence $(date -u +%F)"
+          git push
