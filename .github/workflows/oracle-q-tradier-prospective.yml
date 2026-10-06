@@ -1,0 +1,20 @@
+name: Oracle-Q Tradier Prospective Observation
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  observe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install pandas requests pytest
+      - name: Unit guardrails
+        run: python -m pytest -q tests/test_options_provider.py tests/test_prospective_options.py
+      - name: Prospective read-only observation
+        env:
+          TRADIER_PRODUCTION_TOKEN: ${{ secrets.TRADIER_TOKEN }}
+        run: python oracle_q_prospective_tradier.py
