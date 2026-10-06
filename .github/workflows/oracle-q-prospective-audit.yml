@@ -30,4 +30,4 @@ jobs:
           name: oracle-q-prospective-audit
           path: out/prospective_audit.json
           retention-days: 90
-# audit-v1
+# audit-v2 maturity
