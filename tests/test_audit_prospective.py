@@ -20,3 +20,9 @@ def test_future_seldon_is_rejected(tmp_path):
 def test_order_authority_is_rejected(tmp_path):
  x=base();x["orders_enabled"]=True;p=tmp_path/"x.json";p.write_text(json.dumps(x))
  r=audit_record(p);assert not r["ok"] and "orders_enabled" in r["errors"]
+
+def test_excluded_record_can_be_intact_but_inadmissible(tmp_path):
+ p=tmp_path/"2026-10-06.json";p.write_text(json.dumps(base()))
+ r=audit_record(p,{"2026-10-06.json":{"reason":"partial session"}})
+ assert r["ok"] is True and r["admissible"] is False
+ assert r["inadmissible_reason"]=="partial session"
