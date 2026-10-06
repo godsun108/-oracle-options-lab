@@ -6,6 +6,7 @@ on:
       - "prospective_records/**"
       - "oracle_q/audit_prospective.py"
       - "tests/test_audit_prospective.py"
+      - "prospective_records/admissibility.json"
       - ".github/workflows/oracle-q-prospective-audit.yml"
   schedule:
     - cron: '15 23 * * 1-5'
