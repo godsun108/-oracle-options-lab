@@ -4,10 +4,10 @@ import os, json
 from oracle_q.forward import evaluate_latest
 from oracle_q.options_provider import TradierOptionsProvider
 from oracle_q.prospective_options import observe, to_json
-from oracle_q.underlying_provider import StooqDailyProvider
+from oracle_q.underlying_provider import TradierDailyProvider
 
 if __name__=="__main__":
-    frame,source=StooqDailyProvider().history("SPY")
+    frame,source=TradierDailyProvider(token=os.getenv("TRADIER_PRODUCTION_TOKEN")).history("SPY")
     signal=evaluate_latest(frame)
     if source["data_cutoff"] != signal.data_cutoff:
         raise SystemExit("underlying provenance cutoff mismatch")
