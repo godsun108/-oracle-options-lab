@@ -7,6 +7,8 @@ on:
     paths:
       - "oracle_q/prospective_options.py"
       - "oracle_q/underlying_provider.py"
+      - "oracle_q/seldon_sidecar.py"
+      - "tests/test_seldon_sidecar.py"
       - "oracle_q_prospective_tradier.py"
       - "tests/test_prospective_options.py"
       - ".github/workflows/oracle-q-tradier-prospective.yml"
@@ -22,7 +24,18 @@ jobs:
           python-version: "3.12"
       - run: python -m pip install pandas requests pytest
       - name: Unit guardrails
-        run: python -m pytest -q tests/test_options_provider.py tests/test_prospective_options.py tests/test_underlying_provider.py
+        run: python -m pytest -q tests/test_options_provider.py tests/test_prospective_options.py tests/test_underlying_provider.py tests/test_seldon_sidecar.py
+      - name: Download latest successful Seldon prospective artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p seldon_artifact
+          run_id="$(gh run list -R godsun108/Seldon --workflow prospective-macro-v1.yml --status success --limit 1 --json databaseId --jq '.[0].databaseId')"
+          if [ -n "$run_id" ]; then
+            gh run download "$run_id" -R godsun108/Seldon -n seldon-prospective-macro-v1 -D seldon_artifact
+          else
+            echo "No successful Seldon prospective artifact found; Oracle will record MISSING."
+          fi
       - name: Prospective read-only observation
         env:
           TRADIER_PRODUCTION_TOKEN: ${{ secrets.TRADIER_TOKEN }}
