@@ -19,6 +19,6 @@ jobs:
         run: python -m pip install requests
       - name: Read-only Tradier smoke test
         env:
-          TRADIER_PRODUCTION_TOKEN: ${{ secrets.TRADIER_PRODUCTION_TOKEN }}
+          TRADIER_PRODUCTION_TOKEN: ${{ secrets.TRADIER_TOKEN }}
           TRADIER_SMOKE_SYMBOL: SPY
         run: python tradier_readonly_smoke.py
