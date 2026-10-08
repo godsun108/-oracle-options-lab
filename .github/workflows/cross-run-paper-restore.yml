@@ -1,0 +1,55 @@
+name: Cross-run paper snapshot restore (synthetic only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      previous_run_id:
+        description: "Prior successful run ID of this workflow; leave blank for bootstrap"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: synthetic-paper-state-chain
+  cancel-in-progress: false
+
+jobs:
+  restore-and-advance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Generate synthetic fixture
+        run: python -m research.fixture_paper_session
+      - name: Download previous snapshot if provided
+        if: ${{ inputs.previous_run_id != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREVIOUS_RUN: ${{ inputs.previous_run_id }}
+        run: |
+          case "$PREVIOUS_RUN" in
+            *[!0-9]*|'') echo "Invalid prior run ID"; exit 1;;
+          esac
+          mkdir -p restore
+          gh run download "$PREVIOUS_RUN" --repo "${{ github.repository }}" --name paper-state --dir restore
+          test -s restore/forward.json
+          cp restore/forward.json paper_state/forward.json
+      - name: Process fixture and verify state
+        run: |
+          python -m research.persistent_forward_runner --plan paper_state/fixture-plan.json --bars paper_state/fixture-bars.json --state paper_state/forward.json --report paper_state/report.json
+          python -c 'import json; p=json.load(open("paper_state/report.json")); assert p["mode"]=="FORWARD_PAPER_ONLY" and not p["orders_enabled"]; print(p)'
+      - name: Upload verified synthetic snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: paper-state
+          path: |
+            paper_state/forward.json
+            paper_state/report.json
+          retention-days: 30
+          if-no-files-found: error
