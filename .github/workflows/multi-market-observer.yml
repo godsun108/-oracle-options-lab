@@ -5,6 +5,8 @@ on:
     paths:
       - "research/multi_market_observer.py"
       - "tests/test_multi_market_observer.py"
+      - "tests/test_daily_focus.py"
+      - "research/daily_focus.py"
       - ".github/workflows/multi-market-observer.yml"
   workflow_dispatch:
   schedule:
@@ -23,7 +25,7 @@ jobs:
         with:
           python-version: "3.11"
       - name: Offline guardrail tests
-        run: python -m unittest discover -s tests -p 'test_multi_market_observer.py' -v
+        run: python -m unittest discover -s tests -p 'test_*market*.py' -v && python -m unittest discover -s tests -p 'test_daily_focus.py' -v
 
   observe:
     if: github.event_name != 'pull_request'
@@ -39,11 +41,15 @@ jobs:
         env:
           TRADIER_TOKEN: ${{ secrets.TRADIER_TOKEN }}
         run: python research/multi_market_observer.py --output multi_market_observation.json
+      - name: Produce daily focus research briefing
+        run: python research/daily_focus.py --input multi_market_observation.json --output daily_market_focus.json
       - name: Retain evidence even on partial data failures
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: multi-market-observation-${{ github.run_id }}
-          path: multi_market_observation.json
+          path: |
+            multi_market_observation.json
+            daily_market_focus.json
           if-no-files-found: warn
           retention-days: 30
