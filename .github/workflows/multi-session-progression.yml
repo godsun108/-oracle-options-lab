@@ -1,0 +1,59 @@
+name: Multi-session synthetic paper progression proof
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/multi-session-progression.yml'
+      - 'research/continuous_fixture.py'
+      - 'research/persistent_forward_runner.py'
+      - 'research/paper_state_snapshot.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  first-session:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Bootstrap first session
+        run: |
+          python -m research.fixture_paper_session
+          python -m research.continuous_fixture --sequence 0
+          python -m research.persistent_forward_runner --plan paper_state/fixture-plan.json --bars paper_state/fixture-bars.json --state paper_state/forward.json --report paper_state/report.json
+          python -c 'import json; r=json.load(open("paper_state/report.json")); assert r["accepted_bars"]==2 and r["last_bar"]=="fixture-00000002"'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: first-session-state
+          path: paper_state/forward.json
+          if-no-files-found: error
+
+  second-session:
+    needs: first-session
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Prepare distinct second session
+        run: |
+          python -m research.fixture_paper_session
+          python -m research.continuous_fixture --sequence 1
+      - uses: actions/download-artifact@v4
+        with:
+          name: first-session-state
+          path: paper_state
+      - name: Resume and advance across independent runner
+        run: |
+          python -m research.persistent_forward_runner --plan paper_state/fixture-plan.json --bars paper_state/fixture-bars.json --state paper_state/forward.json --report paper_state/report.json
+          python -c 'import json; r=json.load(open("paper_state/report.json")); assert r["accepted_bars"]==2 and r["last_bar"]=="fixture-00000004" and r["orders_enabled"] is False'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: second-session-state
+          path: paper_state/forward.json
+          if-no-files-found: error
