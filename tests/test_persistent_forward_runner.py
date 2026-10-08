@@ -22,6 +22,11 @@ class PersistentRunnerTests(unittest.TestCase):
             self.assertEqual(third["accepted_bars"],0)
             self.assertEqual(third["event_count"],3)
             self.assertFalse(third["orders_enabled"])
+    def test_no_rearm_on_exit_bar(self):
+        with tempfile.TemporaryDirectory() as d:
+            result=run(self.plan,self.bars,Path(d)/"state.json")
+            self.assertEqual(result["event_count"],3)
+            self.assertIsNone(result["open_position"])
     def test_plan_mutation_rejected(self):
         with tempfile.TemporaryDirectory() as d:
             path=Path(d)/"state.json"
