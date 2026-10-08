@@ -6,6 +6,8 @@ on:
       - '.github/workflows/cross-run-paper-restore.yml'
       - 'research/persistent_forward_runner.py'
       - 'research/paper_state_snapshot.py'
+  schedule:
+    - cron: '17 23 * * 1-5'
   workflow_dispatch:
     inputs:
       previous_run_id:
@@ -32,11 +34,23 @@ jobs:
           python-version: "3.11"
       - name: Generate synthetic fixture
         run: python -m research.fixture_paper_session
-      - name: Download previous snapshot if provided
-        if: ${{ inputs.previous_run_id != '' }}
+      - name: Resolve prior successful run
+        id: previous
         env:
           GH_TOKEN: ${{ github.token }}
-          PREVIOUS_RUN: ${{ inputs.previous_run_id }}
+          MANUAL_RUN: ${{ inputs.previous_run_id }}
+        run: |
+          if [ -n "$MANUAL_RUN" ]; then
+            PREVIOUS_RUN="$MANUAL_RUN"
+          else
+            PREVIOUS_RUN=$(gh run list --repo "${{ github.repository }}" --workflow cross-run-paper-restore.yml --branch main --status success --limit 15 --json databaseId --jq '.[0].databaseId // empty')
+          fi
+          echo "run_id=$PREVIOUS_RUN" >> "$GITHUB_OUTPUT"
+      - name: Download previous snapshot if provided
+        if: ${{ steps.previous.outputs.run_id != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREVIOUS_RUN: ${{ steps.previous.outputs.run_id }}
         run: |
           case "$PREVIOUS_RUN" in
             *[!0-9]*|'') echo "Invalid prior run ID"; exit 1;;
@@ -52,7 +66,7 @@ jobs:
           python -m research.persistent_forward_runner --plan paper_state/fixture-plan.json --bars paper_state/fixture-bars.json --state paper_state/forward.json --report paper_state/report.json
           python -c 'import json,os; p=json.load(open("paper_state/report.json")); assert p["mode"]=="FORWARD_PAPER_ONLY" and not p["orders_enabled"]; assert p["accepted_bars"] == (0 if os.getenv("PREVIOUS_RUN") else 2); print(p)'
         env:
-          PREVIOUS_RUN: ${{ inputs.previous_run_id }}
+          PREVIOUS_RUN: ${{ steps.previous.outputs.run_id }}
       - name: Upload verified synthetic snapshot
         uses: actions/upload-artifact@v4
         with:
