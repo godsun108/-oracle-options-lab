@@ -33,6 +33,16 @@ class PersistentRunnerTests(unittest.TestCase):
             run(self.plan,self.bars[:1],path)
             with self.assertRaises(ValueError):
                 run({**self.plan,"trigger":101},self.bars,path)
+    def test_corrupt_snapshot_refuses_resume(self):
+        with tempfile.TemporaryDirectory() as d:
+            path=Path(d)/"state.json"
+            run(self.plan,self.bars[:1],path)
+            import json
+            envelope=json.loads(path.read_text())
+            envelope["payload"]["state"]["cash"]=999999
+            path.write_text(json.dumps(envelope))
+            with self.assertRaises(ValueError):
+                run(self.plan,self.bars,path)
     def test_unvalidated_rejected(self):
         with tempfile.TemporaryDirectory() as d:
             with self.assertRaises(ValueError):
