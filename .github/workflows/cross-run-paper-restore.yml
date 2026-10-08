@@ -68,6 +68,7 @@ jobs:
           gh run download "$PREVIOUS_RUN" --repo "${{ github.repository }}" --name paper-state --dir restore
           test -s restore/forward.json
           cp restore/forward.json paper_state/forward.json
+          python -c 'import json; from research.paper_state_snapshot import read_snapshot; plan=json.load(open("paper_state/fixture-plan.json")); state=read_snapshot("paper_state/forward.json",plan); report=json.load(open("restore/report.json")); assert state["last_bar"]==report["last_bar"], "prior checkpoint mismatch"'
       - name: Generate next synthetic batch
         env:
           PREVIOUS_RUN: ${{ steps.previous.outputs.run_id }}
