@@ -1,0 +1,42 @@
+name: Paper state persistence smoke test (synthetic only)
+
+on:
+  pull_request:
+    paths:
+      - "research/forward_paper.py"
+      - "research/persistent_forward_runner.py"
+      - "research/fixture_paper_session.py"
+      - ".github/workflows/paper-state-smoke.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-paper:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Create synthetic input (not market data)
+        run: python research/fixture_paper_session.py
+      - name: Process first synthetic bar
+        run: |
+          python -c 'import json; p="paper_state/fixture-bars.json"; bars=json.load(open(p)); json.dump(bars[:1],open("paper_state/first.json","w"))'
+          python -m research.persistent_forward_runner --plan paper_state/fixture-plan.json --bars paper_state/first.json --state paper_state/forward.json --report paper_state/first-report.json
+      - name: Resume using both synthetic bars
+        run: python -m research.persistent_forward_runner --plan paper_state/fixture-plan.json --bars paper_state/fixture-bars.json --state paper_state/forward.json --report paper_state/final-report.json
+      - name: Verify persisted restart behavior
+        run: |
+          python -c 'import json; a=json.load(open("paper_state/first-report.json")); b=json.load(open("paper_state/final-report.json")); assert a["accepted_bars"]==1 and b["accepted_bars"]==1 and b["event_count"]==3 and not b["orders_enabled"]'
+      - name: Upload synthetic-only evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: synthetic-paper-state-${{ github.run_id }}
+          path: paper_state/
+          retention-days: 14
+          if-no-files-found: warn
