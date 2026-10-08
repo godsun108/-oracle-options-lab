@@ -6,6 +6,8 @@ on:
       - '.github/workflows/cross-run-paper-restore.yml'
       - 'research/persistent_forward_runner.py'
       - 'research/paper_state_snapshot.py'
+      - 'research/continuous_fixture.py'
+      - 'tests/test_continuous_fixture.py'
   schedule:
     - cron: '17 23 * * 1-5'
   workflow_dispatch:
@@ -32,7 +34,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Generate synthetic fixture
+      - name: Generate synthetic test plan
         run: python -m research.fixture_paper_session
       - name: Resolve prior successful run
         id: previous
@@ -61,12 +63,24 @@ jobs:
           gh run download "$PREVIOUS_RUN" --repo "${{ github.repository }}" --name paper-state --dir restore
           test -s restore/forward.json
           cp restore/forward.json paper_state/forward.json
+      - name: Generate next synthetic batch
+        env:
+          PREVIOUS_RUN: ${{ steps.previous.outputs.run_id }}
+        run: |
+          if [ -n "$PREVIOUS_RUN" ]; then
+            test -s restore/report.json
+            SEQUENCE=$(python -c 'import json; r=json.load(open("restore/report.json")); t=r["last_bar"]; assert t.startswith("fixture-"); print(int(t.split("-")[1])//2)')
+          else
+            SEQUENCE=0
+          fi
+          echo "sequence=$SEQUENCE" >> "$GITHUB_ENV"
+          python -m research.continuous_fixture --sequence "$SEQUENCE"
       - name: Process fixture and verify state
         run: |
           python -m research.persistent_forward_runner --plan paper_state/fixture-plan.json --bars paper_state/fixture-bars.json --state paper_state/forward.json --report paper_state/report.json
-          python -c 'import json,os; p=json.load(open("paper_state/report.json")); assert p["mode"]=="FORWARD_PAPER_ONLY" and not p["orders_enabled"]; assert p["accepted_bars"] == (0 if os.getenv("PREVIOUS_RUN") else 2); print(p)'
+          python -c 'import json,os; p=json.load(open("paper_state/report.json")); assert p["mode"]=="FORWARD_PAPER_ONLY" and p["orders_enabled"] is False; assert p["accepted_bars"]==2; assert p["last_bar"]=="fixture-{:08d}".format((int(os.environ["SEQUENCE"])+1)*2); print(p)'
         env:
-          PREVIOUS_RUN: ${{ steps.previous.outputs.run_id }}
+          SEQUENCE: ${{ env.sequence }}
       - name: Upload verified synthetic snapshot
         uses: actions/upload-artifact@v4
         with:
