@@ -58,7 +58,12 @@ jobs:
             *[!0-9]*|'') echo "Invalid prior run ID"; exit 1;;
           esac
           mkdir -p restore
-          STATUS=$(gh run view "$PREVIOUS_RUN" --repo "${{ github.repository }}" --json conclusion --jq .conclusion)
+          PREVIOUS_META=$(gh run view "$PREVIOUS_RUN" --repo "${{ github.repository }}" --json conclusion,event,headBranch,workflowName)
+          STATUS=$(printf "%s" "$PREVIOUS_META" | jq -r .conclusion)
+          BRANCH=$(printf "%s" "$PREVIOUS_META" | jq -r .headBranch)
+          WORKFLOW=$(printf "%s" "$PREVIOUS_META" | jq -r .workflowName)
+          test "$BRANCH" = "main" || { echo "Previous run must originate on main"; exit 1; }
+          test "$WORKFLOW" = "Cross-run paper snapshot restore (synthetic only)" || { echo "Unexpected prior workflow"; exit 1; }
           test "$STATUS" = "success" || { echo "Prior run not successful"; exit 1; }
           gh run download "$PREVIOUS_RUN" --repo "${{ github.repository }}" --name paper-state --dir restore
           test -s restore/forward.json
