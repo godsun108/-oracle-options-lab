@@ -1,6 +1,11 @@
 name: Multi-market research observer (read only)
 
 on:
+  pull_request:
+    paths:
+      - "research/multi_market_observer.py"
+      - "tests/test_multi_market_observer.py"
+      - ".github/workflows/multi-market-observer.yml"
   workflow_dispatch:
   schedule:
     - cron: "0 23 * * 1-5"
@@ -9,9 +14,9 @@ permissions:
   contents: read
 
 jobs:
-  observe:
+  tests:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -19,6 +24,17 @@ jobs:
           python-version: "3.11"
       - name: Offline guardrail tests
         run: python -m unittest discover -s tests -p 'test_multi_market_observer.py' -v
+
+  observe:
+    if: github.event_name != 'pull_request'
+    needs: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
       - name: Collect six read-only market observations
         env:
           TRADIER_TOKEN: ${{ secrets.TRADIER_TOKEN }}
