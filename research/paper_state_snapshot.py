@@ -5,6 +5,7 @@ corrupt, incompatible or mismatched strategy state. Not a broker interface.
 """
 import hashlib
 import json
+import os
 from pathlib import Path
 
 SCHEMA=1
