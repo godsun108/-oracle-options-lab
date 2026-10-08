@@ -1,0 +1,33 @@
+name: Multi-market research observer (read only)
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 23 * * 1-5"
+
+permissions:
+  contents: read
+
+jobs:
+  observe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Offline guardrail tests
+        run: python -m unittest discover -s tests -p 'test_multi_market_observer.py' -v
+      - name: Collect six read-only market observations
+        env:
+          TRADIER_TOKEN: ${{ secrets.TRADIER_TOKEN }}
+        run: python research/multi_market_observer.py --output multi_market_observation.json
+      - name: Retain evidence even on partial data failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: multi-market-observation-${{ github.run_id }}
+          path: multi_market_observation.json
+          if-no-files-found: warn
+          retention-days: 30
