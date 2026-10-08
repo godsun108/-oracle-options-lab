@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 from research.conditional_paper import Plan
 from research.forward_paper import initial_state, step
+from research.paper_state_snapshot import read_snapshot, write_snapshot
 
 def run(plan_dict, bars, state_path, initial_cash=2000.0):
     plan=Plan(**plan_dict)
@@ -18,10 +19,7 @@ def run(plan_dict, bars, state_path, initial_cash=2000.0):
         raise ValueError("strategy must be validated before running")
     path=Path(state_path)
     if path.exists():
-        envelope=json.loads(path.read_text(encoding="utf-8"))
-        if envelope["plan"]!=plan_dict:
-            raise ValueError("registered plan changed; refuse to reuse state")
-        state=envelope["state"]
+        state=read_snapshot(path,plan_dict)
     else:
         state=initial_state(initial_cash)
     previous=state["last_bar"]
@@ -33,13 +31,7 @@ def run(plan_dict, bars, state_path, initial_cash=2000.0):
         previous=state["last_bar"]
         accepted+=1
     if accepted:
-        path.parent.mkdir(parents=True,exist_ok=True)
-        tmp=path.with_suffix(path.suffix+".tmp")
-        with tmp.open("w",encoding="utf-8") as f:
-            json.dump({"plan":plan_dict,"state":state},f,indent=2,sort_keys=True)
-            f.flush()
-            os.fsync(f.fileno())
-        os.replace(tmp,path)
+        write_snapshot(path,plan_dict,state)
     return {"accepted_bars":accepted,"last_bar":state["last_bar"],
             "cash":state["cash"],"open_position":state["position"],
             "event_count":len(state["events"]),"orders_enabled":False,
