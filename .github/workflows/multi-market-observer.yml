@@ -19,6 +19,8 @@ on:
       - "tests/test_dispatch_outbox.py"
       - "research/forward_paper.py"
       - "tests/test_forward_paper.py"
+      - "research/persistent_forward_runner.py"
+      - "tests/test_persistent_forward_runner.py"
       - ".github/workflows/multi-market-observer.yml"
   workflow_dispatch:
   schedule:
@@ -37,7 +39,7 @@ jobs:
         with:
           python-version: "3.11"
       - name: Offline guardrail tests
-        run: python -m unittest discover -s tests -p 'test_*market*.py' -v && python -m unittest discover -s tests -p 'test_daily_focus.py' -v && python -m unittest discover -s tests -p 'test_conditional_paper.py' -v && python -m unittest discover -s tests -p 'test_paper_ledger.py' -v && python -m unittest discover -s tests -p 'test_paper_research_runner.py' -v && python -m unittest discover -s tests -p 'test_opportunity_dispatch.py' -v && python -m unittest discover -s tests -p 'test_dispatch_outbox.py' -v && python -m unittest discover -s tests -p 'test_forward_paper.py' -v
+        run: python -m unittest discover -s tests -p 'test_*market*.py' -v && python -m unittest discover -s tests -p 'test_daily_focus.py' -v && python -m unittest discover -s tests -p 'test_conditional_paper.py' -v && python -m unittest discover -s tests -p 'test_paper_ledger.py' -v && python -m unittest discover -s tests -p 'test_paper_research_runner.py' -v && python -m unittest discover -s tests -p 'test_opportunity_dispatch.py' -v && python -m unittest discover -s tests -p 'test_dispatch_outbox.py' -v && python -m unittest discover -s tests -p 'test_forward_paper.py' -v && python -m unittest discover -s tests -p 'test_persistent_forward_runner.py' -v
 
   observe:
     if: github.event_name != 'pull_request'
