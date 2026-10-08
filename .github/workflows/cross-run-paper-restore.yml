@@ -78,7 +78,7 @@ jobs:
       - name: Process fixture and verify state
         run: |
           python -m research.persistent_forward_runner --plan paper_state/fixture-plan.json --bars paper_state/fixture-bars.json --state paper_state/forward.json --report paper_state/report.json
-          python -c 'import json,os; p=json.load(open("paper_state/report.json")); assert p["mode"]=="FORWARD_PAPER_ONLY" and not p["orders_enabled"]; assert p["accepted_bars"] == 2; assert p["last_bar"] == f"fixture-{(int(os.getenv(\"SEQUENCE\",\"0\"))+1)*2:08d}"; print(p)'
+          python -c 'import json,os; p=json.load(open("paper_state/report.json")); assert p["mode"]=="FORWARD_PAPER_ONLY" and p["orders_enabled"] is False; assert p["accepted_bars"]==2; assert p["last_bar"]=="fixture-{:08d}".format((int(os.environ["SEQUENCE"])+1)*2); print(p)'
         env:
           SEQUENCE: ${{ env.sequence }}
       - name: Upload verified synthetic snapshot
