@@ -9,6 +9,8 @@ on:
       - "research/daily_focus.py"
       - "research/conditional_paper.py"
       - "tests/test_conditional_paper.py"
+      - "research/paper_ledger.py"
+      - "tests/test_paper_ledger.py"
       - ".github/workflows/multi-market-observer.yml"
   workflow_dispatch:
   schedule:
@@ -27,7 +29,7 @@ jobs:
         with:
           python-version: "3.11"
       - name: Offline guardrail tests
-        run: python -m unittest discover -s tests -p 'test_*market*.py' -v && python -m unittest discover -s tests -p 'test_daily_focus.py' -v && python -m unittest discover -s tests -p 'test_conditional_paper.py' -v
+        run: python -m unittest discover -s tests -p 'test_*market*.py' -v && python -m unittest discover -s tests -p 'test_daily_focus.py' -v && python -m unittest discover -s tests -p 'test_conditional_paper.py' -v && python -m unittest discover -s tests -p 'test_paper_ledger.py' -v
 
   observe:
     if: github.event_name != 'pull_request'
