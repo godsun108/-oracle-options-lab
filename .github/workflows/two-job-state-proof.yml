@@ -1,0 +1,51 @@
+name: Paper snapshot transfer proof (synthetic only)
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/two-job-state-proof.yml'
+      - 'research/persistent_forward_runner.py'
+      - 'research/paper_state_snapshot.py'
+      - 'research/fixture_paper_session.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  produce:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Produce first account state
+        run: |
+          python -m research.fixture_paper_session
+          python -m research.persistent_forward_runner --plan paper_state/fixture-plan.json --bars paper_state/fixture-bars.json --state paper_state/forward.json --report paper_state/report.json
+          python -c 'import json; r=json.load(open("paper_state/report.json")); assert r["accepted_bars"] == 2 and r["last_bar"] == "fixture-002"'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: independent-job-state
+          path: paper_state/forward.json
+          if-no-files-found: error
+
+  restore:
+    needs: produce
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Regenerate identical fixture in separate runner
+        run: python -m research.fixture_paper_session
+      - uses: actions/download-artifact@v4
+        with:
+          name: independent-job-state
+          path: paper_state
+      - name: Reject replay and prove original account preserved
+        run: |
+          python -m research.persistent_forward_runner --plan paper_state/fixture-plan.json --bars paper_state/fixture-bars.json --state paper_state/forward.json --report paper_state/report.json
+          python -c 'import json; r=json.load(open("paper_state/report.json")); assert r["accepted_bars"] == 0 and r["last_bar"] == "fixture-002" and r["mode"] == "FORWARD_PAPER_ONLY" and r["orders_enabled"] is False'
