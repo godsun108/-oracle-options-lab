@@ -8,6 +8,8 @@ on:
       - 'research/paper_state_snapshot.py'
       - 'research/continuous_fixture.py'
       - 'tests/test_continuous_fixture.py'
+      - 'research/checkpoint_gate.py'
+      - 'tests/test_checkpoint_gate.py'
   schedule:
     - cron: '17 23 * * 1-5'
   workflow_dispatch:
@@ -34,6 +36,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - name: Test checkpoint acceptance and rejection
+        run: python -m unittest tests.test_checkpoint_gate
       - name: Generate synthetic test plan
         run: python -m research.fixture_paper_session
       - name: Resolve prior successful run
@@ -68,7 +72,7 @@ jobs:
           gh run download "$PREVIOUS_RUN" --repo "${{ github.repository }}" --name paper-state --dir restore
           test -s restore/forward.json
           cp restore/forward.json paper_state/forward.json
-          python -c 'import json; from research.paper_state_snapshot import read_snapshot; plan=json.load(open("paper_state/fixture-plan.json")); state=read_snapshot("paper_state/forward.json",plan); report=json.load(open("restore/report.json")); assert state["last_bar"]==report["last_bar"], "prior checkpoint mismatch"'
+          python -c 'import json; from research.checkpoint_gate import validate_checkpoint; plan=json.load(open("paper_state/fixture-plan.json")); report=json.load(open("restore/report.json")); validate_checkpoint("paper_state/forward.json",plan,report)'
       - name: Generate next synthetic batch
         env:
           PREVIOUS_RUN: ${{ steps.previous.outputs.run_id }}
