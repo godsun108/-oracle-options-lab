@@ -26,9 +26,9 @@ jobs:
       - name: Process first synthetic bar
         run: |
           python -c 'import json; p="paper_state/fixture-bars.json"; bars=json.load(open(p)); json.dump(bars[:1],open("paper_state/first.json","w"))'
-          python research/persistent_forward_runner.py --plan paper_state/fixture-plan.json --bars paper_state/first.json --state paper_state/forward.json --report paper_state/first-report.json
+          python -m research.persistent_forward_runner --plan paper_state/fixture-plan.json --bars paper_state/first.json --state paper_state/forward.json --report paper_state/first-report.json
       - name: Resume using both synthetic bars
-        run: python research/persistent_forward_runner.py --plan paper_state/fixture-plan.json --bars paper_state/fixture-bars.json --state paper_state/forward.json --report paper_state/final-report.json
+        run: python -m research.persistent_forward_runner --plan paper_state/fixture-plan.json --bars paper_state/fixture-bars.json --state paper_state/forward.json --report paper_state/final-report.json
       - name: Verify persisted restart behavior
         run: |
           python -c 'import json; a=json.load(open("paper_state/first-report.json")); b=json.load(open("paper_state/final-report.json")); assert a["accepted_bars"]==1 and b["accepted_bars"]==1 and b["event_count"]==3 and not b["orders_enabled"]'
