@@ -41,6 +41,7 @@ def step(state, plan, bar, fee_per_share=0.0, slippage_per_share=0.01):
                     s["position"]={"entry":entry,"qty":qty,"entry_time":t,"bars_held":0}
                     s["events"].append({"type":"PAPER_ENTRY","time":t,"price":entry,"qty":qty})
         s["pending"]=None
+    exited_this_bar=False
     if s["position"] is not None:
         pos=s["position"]
         pos["bars_held"]+=1
@@ -64,7 +65,8 @@ def step(state, plan, bar, fee_per_share=0.0, slippage_per_share=0.01):
             s["events"].append({"type":"PAPER_EXIT","time":t,"price":exit_price,
                                 "qty":pos["qty"],"pnl":round(pnl,2),"reason":reason})
             s["position"]=None
-    if s["position"] is None and s["pending"] is None and side==1:
+            exited_this_bar=True
+    if not exited_this_bar and s["position"] is None and s["pending"] is None and side==1:
         if bar["close"]>=plan.trigger:
             s["pending"]={"signal_time":t}
             s["events"].append({"type":"PAPER_SIGNAL","time":t})
