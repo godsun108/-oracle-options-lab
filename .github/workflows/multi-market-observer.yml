@@ -7,6 +7,8 @@ on:
       - '.github/workflows/multi-market-observer.yml'
   pull_request:
     paths:
+      - "research/paco_snapshot_collector.py"
+      - "tests/test_paco_snapshot_collector.py"
       - "research/paco_tradier_chains.py"
       - "tests/test_paco_tradier_chains.py"
       - "research/paco_quote_evidence.py"
@@ -84,6 +86,8 @@ jobs:
           python-version: "3.11"
       - name: Test multi-day cash progress evidence
         run: python -m unittest tests.test_cash_progress_report -v
+      - name: Test PACO scheduled snapshot collector
+        run: python -m unittest tests.test_paco_snapshot_collector -v
       - name: Test PACO Tradier read-only options chain adapter
         run: python -m unittest tests.test_paco_tradier_chains -v
       - name: Test PACO option quote evidence gate
@@ -171,6 +175,11 @@ jobs:
       - name: Show feed verification in GitHub run summary
         if: always()
         run: python -m research.feed_run_summary --evidence feed_evidence.json --summary "$GITHUB_STEP_SUMMARY"
+      - name: Collect PACO read-only SPY option-chain evidence
+        continue-on-error: true
+        env:
+          TRADIER_TOKEN: \${{ secrets.TRADIER_TOKEN }}
+        run: python -m research.paco_snapshot_collector --output paco_option_chain_snapshots.json
       - name: Retain evidence even on partial data failures
         if: always()
         uses: actions/upload-artifact@v4
@@ -182,5 +191,6 @@ jobs:
             feed_evidence.json
             cash_baseline.json
             cash_observation_ledger.json
+            paco_option_chain_snapshots.json
           if-no-files-found: warn
           retention-days: 30
