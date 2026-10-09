@@ -9,6 +9,8 @@ on:
     paths:
       - "research/paco_tradier_auth_diagnostic.py"
       - "tests/test_paco_tradier_auth_diagnostic.py"
+      - "research/paco_spx_signal_feed.py"
+      - "tests/test_paco_spx_signal_feed.py"
       - "research/paco_signal_gated_audit.py"
       - "tests/test_paco_signal_gated_audit.py"
       - "research/paco_quote_outcome_audit.py"
@@ -98,6 +100,8 @@ jobs:
         run: python -m unittest tests.test_cash_progress_report -v
       - name: Test PACO Tradier authentication diagnostics
         run: python -m unittest tests.test_paco_tradier_auth_diagnostic -v
+      - name: Test PACO SPX signal feed
+        run: python -m unittest tests.test_paco_spx_signal_feed -v
       - name: Test PACO signal-gated research audit
         run: python -m unittest tests.test_paco_signal_gated_audit -v
       - name: Test PACO observational quote outcome audit
@@ -258,6 +262,17 @@ jobs:
           else
             echo 'No PACO premium comparison; outcome audit deferred'
           fi
+      - name: Collect PACO SPX close signal evidence
+        if: always()
+        continue-on-error: true
+        env:
+          TRADIER_TOKEN: ${{ secrets.TRADIER_TOKEN }}
+        run: |
+          if [ -s paco_option_chain_snapshots.json ]; then
+            python -m research.paco_spx_signal_feed --collection paco_option_chain_snapshots.json --output paco_spx_signal_evidence.json
+          else
+            echo 'PACO collection unavailable; SPX signal evidence deferred'
+          fi
       - name: Gate PACO outcomes on independently supplied SPX close signal
         if: always()
         continue-on-error: true
@@ -293,5 +308,6 @@ jobs:
             paco_premium_comparison.json
             paco_quote_outcome_audit.json
             paco_signal_gated_audit.json
+            paco_spx_signal_evidence.json
           if-no-files-found: warn
           retention-days: 30
