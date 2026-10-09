@@ -7,6 +7,8 @@ on:
       - '.github/workflows/multi-market-observer.yml'
   pull_request:
     paths:
+      - "research/paco_tradier_chains.py"
+      - "tests/test_paco_tradier_chains.py"
       - "research/paco_quote_evidence.py"
       - "tests/test_paco_quote_evidence.py"
       - "research/paco_performance_report.py"
@@ -82,6 +84,8 @@ jobs:
           python-version: "3.11"
       - name: Test multi-day cash progress evidence
         run: python -m unittest tests.test_cash_progress_report -v
+      - name: Test PACO Tradier read-only options chain adapter
+        run: python -m unittest tests.test_paco_tradier_chains -v
       - name: Test PACO option quote evidence gate
         run: python -m unittest tests.test_paco_quote_evidence -v
       - name: Test PACO hypothetical performance reporting
