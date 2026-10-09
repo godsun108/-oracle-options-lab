@@ -11,7 +11,7 @@ class CollectorTests(unittest.TestCase):
         r=collect("fixture",today=date(2026,10,9),
                   fetch_expirations=lambda:["2026-10-10","2026-11-13","2026-12-04"],
                   fetch_options=chain)
-        self.assertEqual(r["expirations_requested"],["2026-11-13"])
+        self.assertEqual(r["expirations_requested"],["2026-11-13","2026-12-04"])
         self.assertFalse(r["provider_quote_freshness_verified"])
         self.assertFalse(r["orders_enabled"])
         self.assertEqual(len(r["sha256"]),64)
