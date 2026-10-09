@@ -121,7 +121,8 @@ jobs:
               cp restore/cash_observation_ledger.json cash_observation_ledger.json
               echo "Restored cash ledger from run $PREVIOUS"
             else
-              echo "Previous run has no cash ledger: bootstrap"
+              echo "::error::Prior successful observation artifact lacks cash ledger; refusing silent reset"
+              exit 1
             fi
           else
             echo "No prior successful observation artifact: bootstrap"
