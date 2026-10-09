@@ -9,6 +9,8 @@ on:
     paths:
       - "research/paco_tradier_auth_diagnostic.py"
       - "tests/test_paco_tradier_auth_diagnostic.py"
+      - "research/paco_spx_fred_live_crosscheck.py"
+      - "tests/test_paco_spx_fred_live_crosscheck.py"
       - "research/paco_fred_sp500_collector.py"
       - "tests/test_paco_fred_sp500_collector.py"
       - "research/paco_spx_fred_crosscheck.py"
@@ -110,6 +112,8 @@ jobs:
         run: python -m unittest tests.test_paco_tradier_auth_diagnostic -v
       - name: Test PACO SPX history diagnostic
         run: python -m unittest tests.test_paco_spx_history_diagnostic -v
+      - name: Test PACO live FRED Tradier SPX crosscheck
+        run: python -m unittest tests.test_paco_spx_fred_live_crosscheck -v
       - name: Test PACO FRED CSV collection
         run: python -m unittest tests.test_paco_fred_sp500_collector -v
       - name: Test PACO independent FRED SP500 comparison
@@ -297,6 +301,17 @@ jobs:
         if: always()
         continue-on-error: true
         run: python -m research.paco_fred_sp500_collector --output paco_fred_sp500_evidence.json
+      - name: Compare recent Tradier SPX closes with independent FRED observations
+        if: always()
+        continue-on-error: true
+        env:
+          TRADIER_TOKEN: ${{ secrets.TRADIER_TOKEN }}
+        run: |
+          if [ -s paco_fred_sp500_evidence.json ]; then
+            python -m research.paco_spx_fred_live_crosscheck --fred paco_fred_sp500_evidence.json --output paco_spx_fred_live_crosscheck.json
+          else
+            printf '{"schema":"paco-spx-fred-live-crosscheck-v1","status":"SOURCE_UNAVAILABLE","orders_enabled":false,"history_coverage_complete_verified":false}\n' > paco_spx_fred_live_crosscheck.json
+          fi
       - name: Collect PACO SPX close signal evidence
         if: always()
         continue-on-error: true
@@ -347,5 +362,6 @@ jobs:
             paco_spx_history_diagnostic.json
             paco_spx_provenance_gap.json
             paco_fred_sp500_evidence.json
+            paco_spx_fred_live_crosscheck.json
           if-no-files-found: warn
           retention-days: 30
