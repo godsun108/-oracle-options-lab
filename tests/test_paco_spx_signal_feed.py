@@ -10,9 +10,14 @@ class FeedTests(unittest.TestCase):
         self.assertEqual(produce("",collection())["status"],"SIGNAL_EVIDENCE_UNAVAILABLE")
     def test_history_does_not_prove_all_time_high(self):
         days=[date(2025,1,1)+timedelta(days=i) for i in range(300)]
-        rows=[{"date":d.isoformat(),"close":100+i} for i,d in enumerate(days)]\n        observed=[]\n        def fetch(symbol,*args):\n            observed.append(symbol)\n            return rows
+        rows=[{"date":d.isoformat(),"close":100+i} for i,d in enumerate(days)]
+        observed=[]
+        def fetch(symbol,*args):
+            observed.append(symbol)
+            return rows
         result=produce("fake",collection(),fetch=fetch,now=datetime(2026,10,9,15,tzinfo=timezone.utc))
-        self.assertEqual(observed,["SPX"])\n        self.assertEqual(result["status"],"HISTORICAL_COVERAGE_UNVERIFIED")
+        self.assertEqual(observed,["SPX"])
+        self.assertEqual(result["status"],"HISTORICAL_COVERAGE_UNVERIFIED")
         self.assertEqual(result["candidates"],[])
         self.assertFalse(result["history_coverage_complete_verified"])
     def test_insufficient_bars(self):
