@@ -7,6 +7,8 @@ on:
       - '.github/workflows/multi-market-observer.yml'
   pull_request:
     paths:
+      - "research/spx_ath_spy_puts.py"
+      - "tests/test_spx_ath_spy_puts.py"
       - "research/multi_market_observer.py"
       - "research/feed_evidence.py"
       - "research/observation_cash_baseline.py"
