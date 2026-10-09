@@ -16,6 +16,8 @@ def gate(comparison,signal_evidence):
         return result
     if signal_evidence.get("status")!="CANDIDATES_REQUIRE_HISTORICAL_OPTION_QUOTES" or signal_evidence.get("spx_record_close") is not True:
         return result
+    if signal_evidence.get("history_coverage_complete_verified") is not True:
+        return result
     trigger=signal_evidence.get("trigger_date")
     earlier=comparison.get("earlier_collection")
     later=comparison.get("later_collection")

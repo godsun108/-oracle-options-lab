@@ -7,7 +7,7 @@ def comparison():
             "contracts":[{"occ_symbol":"SPY_PUT","earlier_ask":2.5,"later_bid":2.6},{"occ_symbol":"SPY_CALL","earlier_ask":2,"later_bid":3}]}
 def signal():
     return {"orders_enabled":False,"status":"CANDIDATES_REQUIRE_HISTORICAL_OPTION_QUOTES","spx_record_close":True,
-            "trigger_date":"2026-10-08","history_bars":252,"candidates":[{"symbol":"SPY_PUT"}]}
+            "trigger_date":"2026-10-08","history_bars":252,"history_coverage_complete_verified":True,"candidates":[{"symbol":"SPY_PUT"}]}
 class SignalGateTests(unittest.TestCase):
     def test_only_selected_candidate(self):
         r=gate(comparison(),signal())
@@ -22,4 +22,11 @@ class SignalGateTests(unittest.TestCase):
         self.assertEqual(gate(comparison(),s)["eligible_contracts"],0)
     def test_insufficient_history(self):
         s=signal();s["history_bars"]=251
+        self.assertEqual(gate(comparison(),s)["eligible_contracts"],0)
+
+    def test_unverified_historical_coverage_rejected(self):
+        s=signal();s["history_coverage_complete_verified"]=False
+        self.assertEqual(gate(comparison(),s)["eligible_contracts"],0)
+    def test_missing_historical_coverage_rejected(self):
+        s=signal();del s["history_coverage_complete_verified"]
         self.assertEqual(gate(comparison(),s)["eligible_contracts"],0)
