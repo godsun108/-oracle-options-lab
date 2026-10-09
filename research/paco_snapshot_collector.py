@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import os
+import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import date,datetime,timezone
@@ -53,11 +54,22 @@ def main():
     parser=argparse.ArgumentParser()
     parser.add_argument("--output",required=True)
     args=parser.parse_args()
-    result=collect(os.getenv("TRADIER_TOKEN",""))
+    try:
+        result=collect(os.getenv("TRADIER_TOKEN",""))
+    except (urllib.error.HTTPError, urllib.error.URLError, ValueError, KeyError, TypeError, TimeoutError) as exc:
+        result={"schema":"paco-readonly-chain-collection-v1",
+                "status":"FAILED","orders_enabled":False,"snapshots":[],
+                "provider_quote_freshness_verified":False,
+                "error_type":type(exc).__name__,
+                "http_status":exc.code if isinstance(exc,urllib.error.HTTPError) else None,
+                "reason":"OPTIONS_FEED_UNAVAILABLE_OR_UNAUTHORIZED"}
+    else:
+        result["status"]="COLLECTED" if result["snapshots"] else "EMPTY"
     dest=Path(args.output)
     dest.parent.mkdir(parents=True,exist_ok=True)
     dest.write_text(json.dumps(result,indent=2,sort_keys=True)+"\n")
-    print("PACO read-only SPY chain snapshots:",len(result["snapshots"]),
-          "contracts:",sum(len(s["contracts"]) for s in result["snapshots"]),
-          "SHA256:",result["sha256"])
+    print("PACO status:",result["status"],"snapshots:",len(result["snapshots"]))
+    if result["status"]=="FAILED":
+        print("PACO options collection failed:",result["error_type"],result["http_status"])
+        raise SystemExit(1)
 if __name__=="__main__":main()
