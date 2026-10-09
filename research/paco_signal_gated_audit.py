@@ -26,7 +26,7 @@ def gate(comparison,signal_evidence):
         trigger_date=date.fromisoformat(trigger)
         earlier_date=date.fromisoformat(earlier[:10])
         later_date=date.fromisoformat(later[:10])
-        if not (trigger_date<=earlier_date<=later_date):return result
+        if not (trigger_date<earlier_date<=later_date):return result
         if signal_evidence.get("history_bars",0)<252:return result
     except (ValueError,TypeError):return result
     candidates={c.get("symbol") for c in signal_evidence.get("candidates",[]) if isinstance(c,dict)}
