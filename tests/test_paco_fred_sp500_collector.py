@@ -24,7 +24,7 @@ class FredCollectorTests(unittest.TestCase):
             attempts.append(timeout)
             if len(attempts) == 1:
                 raise TimeoutError("timed out")
-            return FakeResponse(b"observation_date,SP500\\n2026-10-07,7000\\n")
+            return FakeResponse(b"observation_date,SP500\n2026-10-07,7000\n")
         r = collect(opener=flaky, sleeper=lambda seconds: None)
         self.assertEqual(r["observation_count"], 1)
         self.assertEqual(len(attempts), 2)
