@@ -9,6 +9,8 @@ on:
     paths:
       - "research/paco_tradier_auth_diagnostic.py"
       - "tests/test_paco_tradier_auth_diagnostic.py"
+      - "research/paco_quote_outcome_audit.py"
+      - "tests/test_paco_quote_outcome_audit.py"
       - "research/paco_premium_comparison.py"
       - "tests/test_paco_premium_comparison.py"
       - "research/paco_snapshot_continuity.py"
@@ -94,6 +96,8 @@ jobs:
         run: python -m unittest tests.test_cash_progress_report -v
       - name: Test PACO Tradier authentication diagnostics
         run: python -m unittest tests.test_paco_tradier_auth_diagnostic -v
+      - name: Test PACO observational quote outcome audit
+        run: python -m unittest tests.test_paco_quote_outcome_audit -v
       - name: Test PACO premium comparison
         run: python -m unittest tests.test_paco_premium_comparison -v
       - name: Test PACO cross-run snapshot continuity
@@ -241,6 +245,15 @@ jobs:
           else
             echo 'No prior and current PACO collection pair; comparison deferred'
           fi
+      - name: Audit hypothetical PACO quote outcomes
+        if: always()
+        continue-on-error: true
+        run: |
+          if [ -s paco_premium_comparison.json ]; then
+            python -m research.paco_quote_outcome_audit --comparison paco_premium_comparison.json --output paco_quote_outcome_audit.json
+          else
+            echo 'No PACO premium comparison; outcome audit deferred'
+          fi
       - name: Show PACO options-feed status in Actions summary
         if: always()
         run: |
@@ -264,5 +277,6 @@ jobs:
             paco_auth_diagnostic.json
             paco_snapshot_continuity.json
             paco_premium_comparison.json
+            paco_quote_outcome_audit.json
           if-no-files-found: warn
           retention-days: 30
