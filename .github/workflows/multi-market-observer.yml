@@ -1,6 +1,10 @@
 name: Multi-market research observer (read only)
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/multi-market-observer.yml'
   pull_request:
     paths:
       - "research/multi_market_observer.py"
