@@ -7,6 +7,11 @@ on:
       - '.github/workflows/multi-market-observer.yml'
   pull_request:
     paths:
+      - "research/options_discount_scanner.py"
+      - "tests/test_options_discount_scanner.py"
+      - "research/paco_terminator.py"
+      - "tests/test_paco_terminator.py"
+      - "research/PACO_STRATEGY.md"
       - "research/spx_ath_spy_puts.py"
       - "tests/test_spx_ath_spy_puts.py"
       - "research/multi_market_observer.py"
