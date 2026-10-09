@@ -4,6 +4,7 @@ Checks provenance and freshness, never infers trading profitability.
 """
 import argparse
 import datetime as dt
+import hashlib
 import json
 from pathlib import Path
 from research.multi_market_observer import SYMBOLS, eligible_cutoff
@@ -11,6 +12,10 @@ from research.multi_market_observer import SYMBOLS, eligible_cutoff
 def assess(payload, now=None):
     cutoff=eligible_cutoff(now)
     problems=[]
+    sealed={k:v for k,v in payload.items() if k!='sha256'}
+    digest=hashlib.sha256(json.dumps(sealed,sort_keys=True).encode()).hexdigest()
+    if payload.get('sha256')!=digest:
+        problems.append('OBSERVATION_DIGEST_MISMATCH')
     if payload.get("schema")!="oracle-q-multi-market-observation-v1":
         problems.append("SCHEMA_MISMATCH")
     if payload.get("provider")!="tradier" or payload.get("orders_enabled") is not False or payload.get("research_only") is not True:
