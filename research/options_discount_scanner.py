@@ -6,13 +6,13 @@ quotes are considered; no fill or instant profit is implied.
 import math
 
 def screen(quotes, *, max_spread_pct=0.20, min_discount_pct=0.15,
-           fee_per_contract=0.65, max_quote_age_seconds=2.0):
+           fee_per_contract=0.65, max_quote_age_seconds=2.0,\n           market_regime="NEUTRAL"):\n    if market_regime not in ("HIGH", "LOW", "NEUTRAL"):\n        raise ValueError("unknown market regime")
     findings=[]
     for q in quotes:
         try:
             bid=float(q["bid"]); ask=float(q["ask"]); reference=float(q["reference_mid"])
             age=float(q["quote_age_seconds"]); size=int(q["ask_size"])
-            dte=int(q["dte"])
+            dte=int(q["dte"])\n            side=str(q["type"]).lower()\n            if side not in ("put", "call"):\n                continue\n            if (side=="put" and not 30<=dte<=60) or (side=="call" and dte<30):\n                continue
             if not all(math.isfinite(x) for x in (bid,ask,reference,age)):
                 continue
             if bid<0 or ask<=0 or reference<=0 or ask<bid or age<0 or age>max_quote_age_seconds:
@@ -25,7 +25,7 @@ def screen(quotes, *, max_spread_pct=0.20, min_discount_pct=0.15,
             # Conservative immediately executable round-trip: buy ask, sell bid.
             net_per_contract=(bid-ask)*100-2*fee_per_contract
             findings.append({
-                "symbol":str(q["symbol"]),"ask":ask,"bid":bid,
+                "symbol":str(q["symbol"]),"type":side,\n                "regime":market_regime,\n                "directional_priority":("HIGH" if side=="put" else "LOW")==market_regime,\n                "ask":ask,"bid":bid,
                 "reference_mid":reference,"discount_pct":round(100*discount,4),
                 "ask_size":size,"dte":dte,
                 "immediate_roundtrip_net_per_contract":round(net_per_contract,2),
@@ -35,4 +35,4 @@ def screen(quotes, *, max_spread_pct=0.20, min_discount_pct=0.15,
             })
         except (KeyError,ValueError,TypeError,OverflowError):
             continue
-    return sorted(findings,key=lambda x:x["discount_pct"],reverse=True)
+    return sorted(findings,key=lambda x:(x["directional_priority"],x["discount_pct"]),reverse=True)
