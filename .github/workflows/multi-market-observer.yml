@@ -5,6 +5,8 @@ on:
     paths:
       - "research/multi_market_observer.py"
       - "research/tradier_daily_bars.py"
+      - "research/tradier_paper_bridge.py"
+      - "tests/test_tradier_paper_bridge.py"
       - "tests/test_tradier_daily_bars.py"
       - "tests/test_multi_market_observer.py"
       - "tests/test_daily_focus.py"
@@ -42,6 +44,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - name: Test read-only Tradier paper bridge
+        run: python -m unittest tests.test_tradier_paper_bridge -v
       - name: Validate Tradier daily bar fixtures
         run: python -m unittest tests.test_tradier_daily_bars -v
       - name: Offline guardrail tests
