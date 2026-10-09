@@ -9,6 +9,8 @@ on:
     paths:
       - "research/paco_tradier_auth_diagnostic.py"
       - "tests/test_paco_tradier_auth_diagnostic.py"
+      - "research/paco_fred_sp500_collector.py"
+      - "tests/test_paco_fred_sp500_collector.py"
       - "research/paco_spx_fred_crosscheck.py"
       - "tests/test_paco_spx_fred_crosscheck.py"
       - "research/paco_spx_provenance_gap.py"
@@ -108,6 +110,8 @@ jobs:
         run: python -m unittest tests.test_paco_tradier_auth_diagnostic -v
       - name: Test PACO SPX history diagnostic
         run: python -m unittest tests.test_paco_spx_history_diagnostic -v
+      - name: Test PACO FRED CSV collection
+        run: python -m unittest tests.test_paco_fred_sp500_collector -v
       - name: Test PACO independent FRED SP500 comparison
         run: python -m unittest tests.test_paco_spx_fred_crosscheck -v
       - name: Test PACO SPX official history provenance gap
@@ -289,6 +293,10 @@ jobs:
           else
             echo 'SPX diagnostic missing; provenance report deferred'
           fi
+      - name: Collect independent FRED SP500 closing-price evidence
+        if: always()
+        continue-on-error: true
+        run: python -m research.paco_fred_sp500_collector --output paco_fred_sp500_evidence.json
       - name: Collect PACO SPX close signal evidence
         if: always()
         continue-on-error: true
@@ -338,5 +346,6 @@ jobs:
             paco_spx_signal_evidence.json
             paco_spx_history_diagnostic.json
             paco_spx_provenance_gap.json
+            paco_fred_sp500_evidence.json
           if-no-files-found: warn
           retention-days: 30
