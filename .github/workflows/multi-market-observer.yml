@@ -9,6 +9,8 @@ on:
     paths:
       - "research/multi_market_observer.py"
       - "research/feed_evidence.py"
+      - "research/observation_cash_baseline.py"
+      - "tests/test_observation_cash_baseline.py"
       - "research/feed_run_summary.py"
       - "tests/test_feed_run_summary.py"
       - "tests/test_feed_evidence.py"
@@ -52,6 +54,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - name: Test zero-trade observation baseline
+        run: python -m unittest tests.test_observation_cash_baseline -v
       - name: Test feed run summary
         run: python -m unittest tests.test_feed_run_summary -v
       - name: Test feed evidence gate
@@ -86,6 +90,8 @@ jobs:
             printf '{"schema":"oracle-q-feed-evidence-v1","status":"FAIL","problems":["OBSERVATION_MISSING"],"orders_enabled":false}\n' > feed_evidence.json
             exit 1
           fi
+      - name: Record verified no-trade cash benchmark
+        run: python -m research.observation_cash_baseline --observation multi_market_observation.json --output cash_baseline.json
       - name: Produce daily focus research briefing
         run: python research/daily_focus.py --input multi_market_observation.json --output daily_market_focus.json
       - name: Show feed verification in GitHub run summary
@@ -100,5 +106,6 @@ jobs:
             multi_market_observation.json
             daily_market_focus.json
             feed_evidence.json
+            cash_baseline.json
           if-no-files-found: warn
           retention-days: 30
