@@ -11,6 +11,8 @@ on:
       - "research/feed_evidence.py"
       - "research/observation_cash_baseline.py"
       - "research/cash_observation_ledger.py"
+      - "research/cash_ledger_run_summary.py"
+      - "tests/test_cash_ledger_run_summary.py"
       - "tests/test_cash_observation_ledger.py"
       - "tests/test_observation_cash_baseline.py"
       - "research/feed_run_summary.py"
@@ -61,6 +63,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - name: Test cash checkpoint run summary
+        run: python -m unittest tests.test_cash_ledger_run_summary -v
       - name: Test append-only cash observation ledger
         run: python -m unittest tests.test_cash_observation_ledger -v
       - name: Test zero-trade observation baseline
@@ -129,6 +133,8 @@ jobs:
           fi
       - name: Create first cash observation checkpoint
         run: python -m research.cash_observation_ledger --baseline cash_baseline.json --state cash_observation_ledger.json
+      - name: Report cash checkpoint continuity in Actions summary
+        run: python -m research.cash_ledger_run_summary --ledger cash_observation_ledger.json --summary "$GITHUB_STEP_SUMMARY"
       - name: Produce daily focus research briefing
         run: python research/daily_focus.py --input multi_market_observation.json --output daily_market_focus.json
       - name: Show feed verification in GitHub run summary
