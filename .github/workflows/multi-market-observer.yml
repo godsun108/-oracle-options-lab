@@ -46,6 +46,11 @@ on:
 
 permissions:
   contents: read
+  actions: read
+
+concurrency:
+  group: oracle-q-live-observation-chain
+  cancel-in-progress: false
 
 jobs:
   tests:
@@ -96,6 +101,31 @@ jobs:
           fi
       - name: Record verified no-trade cash benchmark
         run: python -m research.observation_cash_baseline --observation multi_market_observation.json --output cash_baseline.json
+      - name: Restore previous verified cash observation checkpoint
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          PREVIOUS=$(gh run list --repo "${{ github.repository }}" --workflow multi-market-observer.yml --branch main --status success --limit 30 --json databaseId --jq '.[].databaseId' | while read -r id; do
+            if [ "$id" != "${{ github.run_id }}" ]; then
+              if gh api "repos/${{ github.repository }}/actions/runs/$id/artifacts" --jq '.artifacts[].name' | grep -Fxq "multi-market-observation-$id"; then
+                echo "$id"
+                break
+              fi
+            fi
+          done)
+          if [ -n "$PREVIOUS" ]; then
+            mkdir -p restore
+            gh run download "$PREVIOUS" --repo "${{ github.repository }}" --name "multi-market-observation-$PREVIOUS" --dir restore
+            if [ -s restore/cash_observation_ledger.json ]; then
+              cp restore/cash_observation_ledger.json cash_observation_ledger.json
+              echo "Restored cash ledger from run $PREVIOUS"
+            else
+              echo "Previous run has no cash ledger: bootstrap"
+            fi
+          else
+            echo "No prior successful observation artifact: bootstrap"
+          fi
       - name: Create first cash observation checkpoint
         run: python -m research.cash_observation_ledger --baseline cash_baseline.json --state cash_observation_ledger.json
       - name: Produce daily focus research briefing
