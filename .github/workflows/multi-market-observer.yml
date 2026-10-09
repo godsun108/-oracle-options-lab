@@ -9,6 +9,8 @@ on:
     paths:
       - "research/paco_tradier_auth_diagnostic.py"
       - "tests/test_paco_tradier_auth_diagnostic.py"
+      - "research/paco_snapshot_continuity.py"
+      - "tests/test_paco_snapshot_continuity.py"
       - "research/paco_snapshot_collector.py"
       - "tests/test_paco_snapshot_collector.py"
       - "research/paco_tradier_chains.py"
@@ -90,6 +92,8 @@ jobs:
         run: python -m unittest tests.test_cash_progress_report -v
       - name: Test PACO Tradier authentication diagnostics
         run: python -m unittest tests.test_paco_tradier_auth_diagnostic -v
+      - name: Test PACO cross-run snapshot continuity
+        run: python -m unittest tests.test_paco_snapshot_continuity -v
       - name: Test PACO scheduled snapshot collector
         run: python -m unittest tests.test_paco_snapshot_collector -v
       - name: Test PACO Tradier read-only options chain adapter
@@ -189,6 +193,41 @@ jobs:
         env:
           TRADIER_TOKEN: ${{ secrets.TRADIER_TOKEN }}
         run: python -m research.paco_snapshot_collector --output paco_option_chain_snapshots.json
+      - name: Restore prior PACO snapshot continuity
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p paco-restore
+          PREVIOUS=$(gh run list --repo "${{ github.repository }}" --workflow multi-market-observer.yml --branch main --status success --limit 30 --json databaseId --jq '.[].databaseId' | while read -r id; do
+            if [ "$id" != "${{ github.run_id }}" ]; then
+              if gh api "repos/${{ github.repository }}/actions/runs/$id/artifacts" --jq '.artifacts[].name' | grep -Fxq "multi-market-observation-$id"; then
+                echo "$id"
+                break
+              fi
+            fi
+          done)
+          if [ -n "$PREVIOUS" ]; then
+            gh run download "$PREVIOUS" --repo "${{ github.repository }}" --name "multi-market-observation-$PREVIOUS" --dir paco-restore
+            if [ -s paco-restore/paco_snapshot_continuity.json ]; then
+              echo "Restored PACO continuity from $PREVIOUS"
+            elif [ -s paco-restore/paco_option_chain_snapshots.json ]; then
+              echo "Prior PACO evidence predates continuity feature: new continuity genesis"
+            else
+              echo "Prior run has no PACO evidence: new continuity genesis"
+            fi
+          fi
+      - name: Append verified PACO snapshot continuity
+        if: always()
+        continue-on-error: true
+        run: |
+          if [ -s paco_option_chain_snapshots.json ]; then
+            python -m research.paco_snapshot_continuity --snapshot paco_option_chain_snapshots.json --prior paco-restore/paco_snapshot_continuity.json --output paco_snapshot_continuity.json --run-id "${{ github.run_id }}"
+          else
+            echo 'No PACO snapshots; continuity not advanced'
+            exit 1
+          fi
       - name: Show PACO options-feed status in Actions summary
         if: always()
         run: |
@@ -210,5 +249,6 @@ jobs:
             cash_observation_ledger.json
             paco_option_chain_snapshots.json
             paco_auth_diagnostic.json
+            paco_snapshot_continuity.json
           if-no-files-found: warn
           retention-days: 30
