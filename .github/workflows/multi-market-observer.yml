@@ -182,12 +182,12 @@ jobs:
       - name: Diagnose read-only Tradier options endpoint access
         continue-on-error: true
         env:
-          TRADIER_TOKEN: \${{ secrets.TRADIER_TOKEN }}
+          TRADIER_TOKEN: ${{ secrets.TRADIER_TOKEN }}
         run: python -m research.paco_tradier_auth_diagnostic
       - name: Collect PACO read-only SPY option-chain evidence
         continue-on-error: true
         env:
-          TRADIER_TOKEN: \${{ secrets.TRADIER_TOKEN }}
+          TRADIER_TOKEN: ${{ secrets.TRADIER_TOKEN }}
         run: python -m research.paco_snapshot_collector --output paco_option_chain_snapshots.json
       - name: Show PACO options-feed status in Actions summary
         if: always()
