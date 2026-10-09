@@ -2,7 +2,7 @@ import datetime as dt
 import unittest
 from research.tradier_daily_bars import validate_daily_bars
 
-NOW=dt.datetime(2026,10,8,21,0,tzinfo=dt.timezone.utc)
+NOW=dt.datetime(2026,10,8,19,0,tzinfo=dt.timezone.utc)
 GOOD={"date":"2026-10-07","open":100,"high":103,"low":99,"close":102}
 
 class TradierDailyBarTests(unittest.TestCase):
