@@ -9,6 +9,8 @@ on:
     paths:
       - "research/paco_tradier_auth_diagnostic.py"
       - "tests/test_paco_tradier_auth_diagnostic.py"
+      - "research/paco_signal_gated_audit.py"
+      - "tests/test_paco_signal_gated_audit.py"
       - "research/paco_quote_outcome_audit.py"
       - "tests/test_paco_quote_outcome_audit.py"
       - "research/paco_premium_comparison.py"
@@ -96,6 +98,8 @@ jobs:
         run: python -m unittest tests.test_cash_progress_report -v
       - name: Test PACO Tradier authentication diagnostics
         run: python -m unittest tests.test_paco_tradier_auth_diagnostic -v
+      - name: Test PACO signal-gated research audit
+        run: python -m unittest tests.test_paco_signal_gated_audit -v
       - name: Test PACO observational quote outcome audit
         run: python -m unittest tests.test_paco_quote_outcome_audit -v
       - name: Test PACO premium comparison
@@ -254,6 +258,16 @@ jobs:
           else
             echo 'No PACO premium comparison; outcome audit deferred'
           fi
+      - name: Gate PACO outcomes on independently supplied SPX close signal
+        if: always()
+        continue-on-error: true
+        run: |
+          if [ -s paco_premium_comparison.json ] && [ -s paco_spx_signal_evidence.json ]; then
+            python -m research.paco_signal_gated_audit --comparison paco_premium_comparison.json --signal paco_spx_signal_evidence.json --output paco_signal_gated_audit.json
+          else
+            printf '{"schema":"paco-signal-gated-audit-v1","status":"SIGNAL_EVIDENCE_MISSING","orders_enabled":false,"strategy_profitability_proven":false,"eligible_contracts":0,"hypothetical_outcomes":[]}\\n' > paco_signal_gated_audit.json
+            echo 'PACO strategy signal evidence unavailable; no trades or strategy returns inferred'
+          fi
       - name: Show PACO options-feed status in Actions summary
         if: always()
         run: |
@@ -278,5 +292,6 @@ jobs:
             paco_snapshot_continuity.json
             paco_premium_comparison.json
             paco_quote_outcome_audit.json
+            paco_signal_gated_audit.json
           if-no-files-found: warn
           retention-days: 30
