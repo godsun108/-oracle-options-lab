@@ -5,6 +5,8 @@ import hashlib
 import io
 import json
 import math
+import time
+import urllib.error
 import urllib.request
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -34,10 +36,22 @@ def parse_csv(data):
     return rows
 
 
-def collect(*, opener=urllib.request.urlopen):
+def collect(*, opener=urllib.request.urlopen, attempts=2, timeout=12, sleeper=time.sleep):
+    if not 1 <= attempts <= 3 or not 1 <= timeout <= 30:
+        raise ValueError("invalid bounded fetch settings")
     request = urllib.request.Request(URL, headers={"User-Agent": "OracleQ-Research/1.0"})
-    with opener(request, timeout=20) as response:
-        raw = response.read(MAX_BYTES + 1)
+    last_error = None
+    for attempt in range(attempts):
+        try:
+            with opener(request, timeout=timeout) as response:
+                raw = response.read(MAX_BYTES + 1)
+            break
+        except (TimeoutError, OSError, urllib.error.URLError) as exc:
+            last_error = exc
+            if attempt + 1 < attempts:
+                sleeper(1)
+    else:
+        raise last_error
     if len(raw) > MAX_BYTES:
         raise ValueError("FRED CSV exceeds maximum size")
     rows = parse_csv(raw.decode("utf-8-sig"))
@@ -61,9 +75,25 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("--output", required=True)
     args = p.parse_args()
-    result = collect()
+    try:
+        result = collect()
+        result["status"] = "COLLECTED"
+    except (TimeoutError, OSError, urllib.error.URLError, ValueError, UnicodeError, csv.Error) as exc:
+        result = {
+            "schema": "paco-fred-sp500-evidence-v1",
+            "status": "SOURCE_UNAVAILABLE",
+            "error_type": type(exc).__name__,
+            "source_url": URL,
+            "retrieved_at_utc": datetime.now(timezone.utc).isoformat(),
+            "observations": [],
+            "observation_count": 0,
+            "history_coverage_complete_verified": False,
+            "orders_enabled": False,
+        }
     Path(args.output).write_text(json.dumps(result, sort_keys=True, indent=2) + "\n")
-    print("FRED SP500 fetched:", result["observation_count"], "dates", result["first_date"], result["last_date"])
+    print("FRED SP500 collection:", result["status"], "observations:", result["observation_count"])
+    if result["status"] != "COLLECTED":
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":
