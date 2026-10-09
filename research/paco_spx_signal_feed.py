@@ -19,7 +19,7 @@ def produce(token,collection,*,fetch=request_history,now=None):
     cutoff=eligible_cutoff(now)
     # The signal date must predate option entry observation, so never use today's incomplete close.
     try:
-        rows=fetch("$SPX",token,"1950-01-01",cutoff.isoformat())
+        rows=fetch("SPX",token,"1950-01-01",cutoff.isoformat())
         bars={}
         for row in rows:
             d=date.fromisoformat(str(row["date"])[:10])
@@ -44,7 +44,7 @@ def produce(token,collection,*,fetch=request_history,now=None):
         s=signal(ordered,contracts,as_of=last)
         output.update(s)
         output["source"]="tradier"
-        output["underlying_requested"]="$SPX"
+        output["underlying_requested"]="SPX"
         output["history_first_date"]=ordered[0]["date"]
         output["history_last_date"]=last
         output["history_coverage_complete_verified"]=False
