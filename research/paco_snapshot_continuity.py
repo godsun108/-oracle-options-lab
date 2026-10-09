@@ -25,6 +25,8 @@ def append(previous,current,run_id):
             if entry.get("previous_sha256")!=prev_hash or entry.get("entry_sha256")!=digest(body):
                 raise ValueError("prior PACO chain failed verification")
             prev_hash=entry["entry_sha256"]
+        if previous.get("head_sha256")!=prev_hash or previous.get("runs_recorded")!=len(entries):
+            raise ValueError("prior PACO head or count mismatch")
         if any(str(e["run_id"])==str(run_id) for e in entries):
             raise ValueError("duplicate run id")
     last=entries[-1]["entry_sha256"] if entries else None
