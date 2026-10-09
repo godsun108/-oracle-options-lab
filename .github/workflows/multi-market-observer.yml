@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - "research/multi_market_observer.py"
+      - "research/feed_evidence.py"
+      - "tests/test_feed_evidence.py"
       - "research/tradier_daily_bars.py"
       - "research/tradier_paper_bridge.py"
       - "tests/test_tradier_paper_bridge.py"
@@ -44,6 +46,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - name: Test feed evidence gate
+        run: python -m unittest tests.test_feed_evidence -v
       - name: Test read-only Tradier paper bridge
         run: python -m unittest tests.test_tradier_paper_bridge -v
       - name: Validate Tradier daily bar fixtures
@@ -65,6 +69,15 @@ jobs:
         env:
           TRADIER_TOKEN: ${{ secrets.TRADIER_TOKEN }}
         run: python research/multi_market_observer.py --output multi_market_observation.json
+      - name: Assess observed feed quality
+        if: always()
+        run: |
+          if [ -f multi_market_observation.json ]; then
+            python -m research.feed_evidence --input multi_market_observation.json --output feed_evidence.json
+          else
+            printf '{"schema":"oracle-q-feed-evidence-v1","status":"FAIL","problems":["OBSERVATION_MISSING"],"orders_enabled":false}\n' > feed_evidence.json
+            exit 1
+          fi
       - name: Produce daily focus research briefing
         run: python research/daily_focus.py --input multi_market_observation.json --output daily_market_focus.json
       - name: Retain evidence even on partial data failures
@@ -75,5 +88,6 @@ jobs:
           path: |
             multi_market_observation.json
             daily_market_focus.json
+            feed_evidence.json
           if-no-files-found: warn
           retention-days: 30
