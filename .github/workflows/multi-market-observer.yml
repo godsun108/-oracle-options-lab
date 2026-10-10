@@ -301,6 +301,8 @@ jobs:
       - name: Collect independent FRED SP500 closing-price evidence
         if: always()
         continue-on-error: true
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
         run: python -m research.paco_fred_sp500_collector --output paco_fred_sp500_evidence.json
       - name: Compare recent Tradier SPX closes with independent FRED observations
         if: always()
@@ -313,6 +315,23 @@ jobs:
           else
             printf '{"schema":"paco-spx-fred-live-crosscheck-v1","status":"SOURCE_UNAVAILABLE","orders_enabled":false,"history_coverage_complete_verified":false}\n' > paco_spx_fred_live_crosscheck.json
           fi
+      - name: Report independent price crosscheck evidence
+        if: always()
+        run: |
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          p = Path("paco_spx_fred_live_crosscheck.json")
+          d = json.loads(p.read_text()) if p.exists() else {}
+          compared = int(d.get("compared_dates") or 0)
+          verified = compared > 0 and d.get("status") not in ("SOURCE_UNAVAILABLE", "NO_OVERLAP")
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as out:
+              out.write("\\n### Independent SPX-FRED price crosscheck\\n")
+              out.write(f"Status: {d.get('status', 'MISSING')} | matched dates: {compared}\\n")
+              out.write(f"Actual price comparison performed: {'YES' if verified else 'NO'}\\n")
+              out.write("Full historical ATH coverage verified: NO\\n")
+          print("SPX-FRED verified comparison:", verified, "matched dates:", compared)
+          PY
       - name: Collect PACO SPX close signal evidence
         if: always()
         continue-on-error: true
