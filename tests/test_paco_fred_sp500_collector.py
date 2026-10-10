@@ -29,6 +29,20 @@ class FredCollectorTests(unittest.TestCase):
         self.assertEqual(r["observation_count"], 1)
         self.assertEqual(len(attempts), 2)
 
+    def test_official_api_fallback_after_csv_timeouts(self):
+        attempts = []
+        def opener(req, timeout):
+            attempts.append(req.full_url)
+            if "fredgraph.csv" in req.full_url:
+                raise TimeoutError("CSV unavailable")
+            return FakeResponse(b'{"observations":[{"date":"2026-10-07","value":"7000.5"}]}')
+        result = collect(opener=opener, sleeper=lambda seconds: None, api_key="test_key")
+        self.assertEqual(result["observation_count"], 1)
+        self.assertEqual(result["observations"][0]["value"], 7000.5)
+        self.assertEqual(len(attempts), 3)
+        self.assertIn("api.stlouisfed.org", attempts[-1])
+        self.assertFalse(result["history_coverage_complete_verified"])
+
     def test_exhausted_retry(self):
         with self.assertRaises(TimeoutError):
             collect(opener=lambda req, timeout: (_ for _ in ()).throw(TimeoutError()), sleeper=lambda seconds: None)

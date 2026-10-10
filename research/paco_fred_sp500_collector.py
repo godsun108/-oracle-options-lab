@@ -4,6 +4,7 @@ import csv
 import hashlib
 import io
 import json
+import os
 import math
 import time
 import urllib.error
@@ -13,6 +14,7 @@ from pathlib import Path
 
 URL = "https://fred.stlouisfed.org/graph/fredgraph.csv?id=SP500"
 MAX_BYTES = 3_000_000
+API_URL = "https://api.stlouisfed.org/fred/series/observations?series_id=SP500&file_type=json&api_key="
 
 
 def parse_csv(data):
@@ -36,7 +38,7 @@ def parse_csv(data):
     return rows
 
 
-def collect(*, opener=urllib.request.urlopen, attempts=2, timeout=12, sleeper=time.sleep):
+def collect(*, opener=urllib.request.urlopen, attempts=2, timeout=12, sleeper=time.sleep, api_key=None):
     if not 1 <= attempts <= 3 or not 1 <= timeout <= 30:
         raise ValueError("invalid bounded fetch settings")
     request = urllib.request.Request(URL, headers={"User-Agent": "OracleQ-Research/1.0"})
@@ -51,7 +53,22 @@ def collect(*, opener=urllib.request.urlopen, attempts=2, timeout=12, sleeper=ti
             if attempt + 1 < attempts:
                 sleeper(1)
     else:
-        raise last_error
+        if not api_key:
+            raise last_error
+        # Official authenticated FRED API fallback; never substitute a different index.
+        api_request = urllib.request.Request(API_URL + api_key, headers={"User-Agent": "OracleQ-Research/1.0"})
+        with opener(api_request, timeout=timeout) as response:
+            api_raw = response.read(MAX_BYTES + 1)
+        if len(api_raw) > MAX_BYTES:
+            raise ValueError("FRED API response exceeds maximum size")
+        payload = json.loads(api_raw)
+        if not isinstance(payload, dict) or not isinstance(payload.get("observations"), list):
+            raise ValueError("Invalid FRED API observations")
+        csv_rows = ["observation_date,SP500"]
+        for item in payload["observations"]:
+            if isinstance(item, dict):
+                csv_rows.append(str(item.get("date", "")) + "," + str(item.get("value", ".")))
+        raw = ("\n".join(csv_rows) + "\n").encode()
     if len(raw) > MAX_BYTES:
         raise ValueError("FRED CSV exceeds maximum size")
     rows = parse_csv(raw.decode("utf-8-sig"))
@@ -76,7 +93,7 @@ def main():
     p.add_argument("--output", required=True)
     args = p.parse_args()
     try:
-        result = collect()
+        result = collect(api_key=os.getenv('FRED_API_KEY') or None)
         result["status"] = "COLLECTED"
     except (TimeoutError, OSError, urllib.error.URLError, ValueError, UnicodeError, csv.Error) as exc:
         result = {
