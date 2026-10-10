@@ -326,10 +326,10 @@ jobs:
           compared = int(d.get("compared_dates") or 0)
           verified = compared > 0 and d.get("status") not in ("SOURCE_UNAVAILABLE", "NO_OVERLAP")
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as out:
-              out.write("\\n### Independent SPX-FRED price crosscheck\\n")
-              out.write(f"Status: {d.get('status', 'MISSING')} | matched dates: {compared}\\n")
-              out.write(f"Actual price comparison performed: {'YES' if verified else 'NO'}\\n")
-              out.write("Full historical ATH coverage verified: NO\\n")
+              out.write("\n### Independent SPX-FRED price crosscheck\n")
+              out.write(f"Status: {d.get('status', 'MISSING')} | matched dates: {compared}\n")
+              out.write(f"Actual price comparison performed: {'YES' if verified else 'NO'}\n")
+              out.write("Full historical ATH coverage verified: NO\n")
           print("SPX-FRED verified comparison:", verified, "matched dates:", compared)
           PY
       - name: Collect PACO SPX close signal evidence
@@ -350,14 +350,14 @@ jobs:
           if [ -s paco_premium_comparison.json ] && [ -s paco_spx_signal_evidence.json ]; then
             python -m research.paco_signal_gated_audit --comparison paco_premium_comparison.json --signal paco_spx_signal_evidence.json --output paco_signal_gated_audit.json
           else
-            printf '{"schema":"paco-signal-gated-audit-v1","status":"SIGNAL_EVIDENCE_MISSING","orders_enabled":false,"strategy_profitability_proven":false,"eligible_contracts":0,"hypothetical_outcomes":[]}\\n' > paco_signal_gated_audit.json
+            printf '{"schema":"paco-signal-gated-audit-v1","status":"SIGNAL_EVIDENCE_MISSING","orders_enabled":false,"strategy_profitability_proven":false,"eligible_contracts":0,"hypothetical_outcomes":[]}\n' > paco_signal_gated_audit.json
             echo 'PACO strategy signal evidence unavailable; no trades or strategy returns inferred'
           fi
       - name: Show PACO options-feed status in Actions summary
         if: always()
         run: |
           if [ -f paco_option_chain_snapshots.json ]; then
-            python -c 'import json,os; p=json.load(open("paco_option_chain_snapshots.json")); f=open(os.environ["GITHUB_STEP_SUMMARY"],"a"); f.write("\\n### PACO options-feed status: "+str(p.get("status","UNKNOWN"))+"\\n"); f.write("HTTP status: "+str(p.get("http_status","n/a"))+"\\n"); f.close()'
+            python -c 'import json,os; p=json.load(open("paco_option_chain_snapshots.json")); f=open(os.environ["GITHUB_STEP_SUMMARY"],"a"); f.write("\n### PACO options-feed status: "+str(p.get("status","UNKNOWN"))+"\n"); f.write("HTTP status: "+str(p.get("http_status","n/a"))+"\n"); f.close()'
           else
             echo '### PACO options-feed status: MISSING (no evidence file)' >> "$GITHUB_STEP_SUMMARY"
           fi
