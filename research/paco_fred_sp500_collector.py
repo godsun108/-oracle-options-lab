@@ -68,7 +68,7 @@ def collect(*, opener=urllib.request.urlopen, attempts=2, timeout=12, sleeper=ti
         for item in payload["observations"]:
             if isinstance(item, dict):
                 csv_rows.append(str(item.get("date", "")) + "," + str(item.get("value", ".")))
-        raw = ("\\n".join(csv_rows) + "\\n").encode()
+        raw = ("\n".join(csv_rows) + "\n").encode()
     if len(raw) > MAX_BYTES:
         raise ValueError("FRED CSV exceeds maximum size")
     rows = parse_csv(raw.decode("utf-8-sig"))
