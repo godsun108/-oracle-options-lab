@@ -8,6 +8,8 @@ on:
   pull_request:
     paths:
       - 'oracle_q/**'
+      - 'tests/**'
+      - '.github/workflows/oracle-guardrails.yml'
 jobs:
   guardrails:
     runs-on: ubuntu-latest
@@ -16,5 +18,5 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: python -m pip install pytest numpy pandas
+      - run: python -m pip install pytest numpy pandas requests
       - run: python -m pytest -q tests
