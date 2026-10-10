@@ -85,6 +85,7 @@ on:
       - "research/paper_state_snapshot.py"
       - "tests/test_paper_state_snapshot.py"
       - ".github/workflows/multi-market-observer.yml"
+      - ".github/workflows/oracle-guardrails.yml"
   workflow_dispatch:
   schedule:
     - cron: "0 23 * * 1-5"
