@@ -1,5 +1,6 @@
 """Conservative PACO research-readiness summary; never infer executable returns."""
 import argparse
+from research.paco_snapshot_continuity import digest
 import json
 from pathlib import Path
 
@@ -14,13 +15,28 @@ def assess(continuity, comparison, signal):
     entries=continuity.get("entries")
     if not isinstance(entries,list) or len(entries)!=runs or runs<1:
         raise ValueError("continuity run count mismatch")
+    previous_hash=None
+    seen_run_ids=set()
+    for entry in entries:
+        if not isinstance(entry,dict):
+            raise ValueError("invalid continuity entry")
+        run_id=str(entry.get("run_id",""))
+        if not run_id or run_id in seen_run_ids:
+            raise ValueError("missing or duplicate continuity run id")
+        seen_run_ids.add(run_id)
+        body={k:v for k,v in entry.items() if k!="entry_sha256"}
+        if entry.get("previous_sha256")!=previous_hash or entry.get("entry_sha256")!=digest(body):
+            raise ValueError("continuity hash chain verification failed")
+        previous_hash=entry["entry_sha256"]
+    if continuity.get("head_sha256")!=previous_hash:
+        raise ValueError("continuity head digest mismatch")
     same_day=comparison.get("same_utc_day")
     cross_day=(same_day is False and comparison.get("status")=="COMPARABLE"
                and comparison.get("matched_contracts",0)>0)
     signal_verified=(signal.get("spx_record_close") is True
                      and signal.get("history_coverage_complete_verified") is True)
     return {"schema":"paco-evidence-readiness-v1","status":"RESEARCH_NOT_VALIDATED",
-            "continuity_runs":runs,"matched_contracts":comparison.get("matched_contracts",0),
+            "continuity_runs":runs,"continuity_hash_chain_verified":True,"matched_contracts":comparison.get("matched_contracts",0),
             "cross_day_quote_pair_observed":bool(cross_day),
             "independent_quote_freshness_verified":False,
             "spx_ath_signal_verified":bool(signal_verified),
