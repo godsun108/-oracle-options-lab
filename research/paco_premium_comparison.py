@@ -1,6 +1,8 @@
 """Conservative PACO option premium comparison between two collected snapshots."""
 import argparse
 import json
+import hashlib
+import math
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -33,10 +35,16 @@ def compare(earlier,later):
                 symbol=c.get("occ_symbol")
                 if not symbol or symbol in found:continue
                 bid=c.get("bid");ask=c.get("ask")
-                if not isinstance(bid,(int,float)) or not isinstance(ask,(int,float)) or bid<0 or ask<=0 or bid>ask:continue
+                if not isinstance(bid,(int,float)) or not isinstance(ask,(int,float)) or not math.isfinite(bid) or not math.isfinite(ask) or bid<0 or ask<=0 or bid>ask:continue
                 found[symbol]=c
         return found
     before=index(earlier);after=index(later)
+    def fingerprint(collection):
+        return hashlib.sha256(json.dumps(collection,sort_keys=True,separators=(",",":"),allow_nan=False).encode()).hexdigest()
+    earlier_sha256=fingerprint(earlier)
+    later_sha256=fingerprint(later)
+    if earlier_sha256==later_sha256:
+        raise ValueError("identical snapshot payloads cannot establish independent observations")
     rows=[]
     for symbol in sorted(before.keys()&after.keys()):
         a=before[symbol];b=after[symbol]
@@ -50,7 +58,9 @@ def compare(earlier,later):
     return {"schema":"paco-premium-comparison-v1","status":("SAME_DAY_OBSERVATIONAL_ONLY" if rows and same_utc_day else "COMPARABLE" if rows else "NO_MATCHING_CONTRACTS"),
             "earlier_collection":earlier.get("collected_at"),"later_collection":later.get("collected_at"),
             "matched_contracts":len(rows),"contracts":rows,"orders_enabled":False,
-            "elapsed_seconds":elapsed_seconds,"same_utc_day":same_utc_day,"multi_day_outcome_verified":False,
+            "elapsed_seconds":elapsed_seconds,"same_utc_day":same_utc_day,
+            "earlier_snapshot_sha256":earlier_sha256,"later_snapshot_sha256":later_sha256,
+            "collection_timestamps_verified":True,"source_payloads_distinct":True,"multi_day_outcome_verified":False,
             "warning":"Observational quotes only: timestamps do not verify quote freshness, execution, or returns."}
 
 def main():
