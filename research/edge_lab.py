@@ -6,7 +6,7 @@ import math
 import os
 from pathlib import Path
 from research.multi_market_observer import SYMBOLS, eligible_cutoff, request_history
-from datetime import date
+from datetime import date, datetime, timezone
 
 WARMUP = 200
 COST_PER_SIDE = 0.001  # conservative 10 basis points on each position transition
@@ -163,6 +163,7 @@ def run(registry, token, *, fetch=request_history, now=None):
                             "error_type":type(exc).__name__,"diagnostic":detail,
                             "orders_enabled":False,"edge_proven":False})
     return {"schema":"oracle-q-edge-lab-v1","status":"HISTORICAL_RESEARCH_ONLY",
+            "observed_at":datetime.now(timezone.utc).isoformat(),
             "cutoff":cutoff.isoformat(),"provider":"tradier","orders_enabled":False,
             "forward_paper_verified":False,"edge_proven":False,
             "cost_model":"10 bps per entry or exit, open-to-next-open, unlevered long/cash",
