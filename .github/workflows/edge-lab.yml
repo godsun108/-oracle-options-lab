@@ -5,6 +5,13 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/edge-lab.yml'
+      - 'research/edge_lab.py'
+      - 'research/edge_forward_paper.py'
+      - 'research/edge_forward_scorecard.py'
+      - 'research/edge_registry.json'
+      - 'tests/test_edge_lab.py'
+      - 'tests/test_edge_forward_paper.py'
+      - 'tests/test_edge_forward_scorecard.py'
   pull_request:
     paths:
       - "research/edge_registry.json"
