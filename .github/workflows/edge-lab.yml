@@ -10,6 +10,8 @@ on:
       - "research/edge_registry.json"
       - "research/edge_lab.py"
       - "research/edge_forward_paper.py"
+      - "research/edge_forward_scorecard.py"
+      - "tests/test_edge_forward_scorecard.py"
       - "tests/test_edge_forward_paper.py"
       - "tests/test_edge_lab.py"
       - ".github/workflows/edge-lab.yml"
@@ -35,7 +37,7 @@ jobs:
         with:
           python-version: "3.11"
       - name: Verify pre-registered edge lab research
-        run: python -m unittest tests.test_edge_lab tests.test_edge_forward_paper -v
+        run: python -m unittest tests.test_edge_lab tests.test_edge_forward_paper tests.test_edge_forward_scorecard -v
 
   research:
     if: github.event_name != 'pull_request'
@@ -77,6 +79,8 @@ jobs:
           fi
       - name: Append and settle delayed forward paper observations
         run: python -m research.edge_forward_paper --current edge_lab_report.json --prior edge-restore/edge_forward_ledger.json --output edge_forward_ledger.json
+      - name: Score paired delayed forward paper outcomes
+        run: python -m research.edge_forward_scorecard --ledger edge_forward_ledger.json --report edge_lab_report.json --output edge_forward_scorecard.json
       - name: Summarize research without promoting historical backtests to proven edges
         if: always()
         run: |
@@ -90,6 +94,12 @@ jobs:
               f.write("Historical backtests are not forward paper performance or verified edges.\n")
               for r in data.get("reports",[]):
                   f.write(f"- {r.get('symbol')}: {r.get('status')}; bars: {r.get('bars','unavailable')}; diagnostic: {r.get('diagnostic',r.get('source_ohlc_diagnostic',{})).get('reason','none')}\n")
+              scorecard=Path("edge_forward_scorecard.json")
+              if scorecard.exists():
+                  sc=json.loads(scorecard.read_text())
+                  f.write(f"Forward scorecard: {sc.get('outcomes_total',0)} settled observations across {len(sc.get('pairs',[]))} strategy-market pairs.\\n")
+                  for pair in sc.get("pairs",[]):
+                      f.write(f"- {pair['symbol']} / {pair['strategy_id']}: {pair['outcomes_observed']} settled, {pair['pending']} pending; status: {pair['status']}\\n")
               f.write("Orders: DISABLED | Real fills: NONE | Proven profitability: NO\n")
           PY
       - name: Retain research evidence
@@ -100,5 +110,6 @@ jobs:
           path: |
             edge_lab_report.json
             edge_forward_ledger.json
+            edge_forward_scorecard.json
           if-no-files-found: warn
           retention-days: 30
