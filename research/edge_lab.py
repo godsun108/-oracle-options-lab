@@ -1,0 +1,123 @@
+"""Read-only, pre-registered multi-market ETF proxy backtests; no orders or fills."""
+import argparse
+import hashlib
+import json
+import math
+import os
+from pathlib import Path
+from research.multi_market_observer import SYMBOLS, eligible_cutoff, request_history
+from research.tradier_daily_bars import validate_daily_bars
+
+WARMUP = 200
+COST_PER_SIDE = 0.001  # conservative 10 basis points on each position transition
+INITIAL_CASH = 2000.0
+IDS = ("tsmom_63", "trend_200", "reversal_5")
+
+def signal(strategy, closes):
+    if len(closes) < WARMUP:
+        raise ValueError("insufficient prior completed closes")
+    if strategy == "tsmom_63":
+        return int(closes[-1] > closes[-64])
+    if strategy == "trend_200":
+        return int(closes[-1] > sum(closes[-200:]) / 200)
+    if strategy == "reversal_5":
+        return int(closes[-1] < closes[-6])
+    raise ValueError("unregistered strategy")
+
+def segment(bars, strategy, start, stop, *, benchmark=False):
+    """Signal from close[i-1], hypothetical entry at open[i], exit/rebalance open[i+1]."""
+    cash = INITIAL_CASH
+    peak = cash
+    worst = 0.0
+    position = 0
+    transitions = 0
+    invested_days = 0
+    for i in range(start, stop):
+        wanted = 1 if benchmark else signal(strategy, [b["close"] for b in bars[:i]])
+        # Charge on the open where a position is changed, not on the signal bar.
+        if wanted != position:
+            cash *= (1 - COST_PER_SIDE)
+            transitions += 1
+        position = wanted
+        invested_days += position
+        cash *= 1 + position * (bars[i+1]["open"] / bars[i]["open"] - 1)
+        if not math.isfinite(cash) or cash <= 0:
+            raise ValueError("invalid simulated equity")
+        peak = max(peak, cash)
+        worst = min(worst, cash / peak - 1)
+    if position:
+        cash *= (1 - COST_PER_SIDE)
+        transitions += 1
+    return {"observations":stop-start,"net_return_pct":round(100*(cash/INITIAL_CASH-1),4),
+            "max_drawdown_pct":round(100*worst,4),"position_changes":transitions,
+            "invested_days":invested_days,"capital_reference_usd":INITIAL_CASH,
+            "fill_verified":False,"cost_per_position_transition_bps":10}
+
+def evaluate(symbol, raw, registry, *, now=None):
+    if symbol not in SYMBOLS or symbol not in registry["proxy_symbols"]:
+        raise ValueError("unregistered market proxy")
+    bars = validate_daily_bars(raw, now=now)
+    if len(bars) < 320:
+        return {"symbol":symbol,"status":"INSUFFICIENT_COMPLETED_BARS",
+                "bars":len(bars),"orders_enabled":False,"edge_proven":False}
+    # The last bar is only used for a *future* signal; no next-open price is available.
+    first = WARMUP
+    stop = len(bars)-1
+    split = first + int((stop-first)*0.7)
+    if split-first < 30 or stop-split < 30:
+        raise ValueError("chronological train/test split too small")
+    payload_hash = hashlib.sha256(json.dumps(bars,sort_keys=True,separators=(",",":")).encode()).hexdigest()
+    rows = []
+    for strategy in IDS:
+        rows.append({"strategy_id":strategy,
+                     "train":segment(bars,strategy,first,split),
+                     "holdout":segment(bars,strategy,split,stop),
+                     "holdout_buy_hold":segment(bars,strategy,split,stop,benchmark=True),
+                     "next_session_paper_signal":signal(strategy,[b["close"] for b in bars]),
+                     "next_session_fill_verified":False,"edge_proven":False})
+    return {"symbol":symbol,"status":"HISTORICAL_PROXY_BACKTEST_ONLY",
+            "bars":len(bars),"first_date":bars[0]["time"],"last_completed_date":bars[-1]["time"],
+            "train_start":bars[first]["time"],"holdout_start":bars[split]["time"],
+            "holdout_end":bars[stop]["time"],"ohlc_sha256":payload_hash,
+            "strategies":rows,"orders_enabled":False,"forward_paper_verified":False,
+            "edge_proven":False,"warnings":["ETF proxies are not exact replications of cited academic strategies.",
+              "Chronological holdout is historical, not independently forward paper-traded.",
+              "Corporate actions, financing, borrow, taxes, and data adjustments are not independently verified.",
+              "No actual fills, live orders, or statistical edge established."]}
+
+def run(registry, token, *, fetch=request_history, now=None):
+    if registry.get("schema") != "oracle-q-edge-registry-v1" or registry.get("enabled_for_execution") is not False:
+        raise ValueError("invalid research-only edge registry")
+    if {c["id"] for c in registry["candidates"] if c.get("testable_with_current_etf_data")} != set(IDS):
+        raise ValueError("registered backtest strategies do not match implementation")
+    if not token:
+        raise ValueError("missing read-only data credential")
+    cutoff=eligible_cutoff(now)
+    start=(cutoff-__import__("datetime").timedelta(days=850)).isoformat()
+    reports=[]
+    for symbol in registry["proxy_symbols"]:
+        try:
+            reports.append(evaluate(symbol,fetch(symbol,token,start,cutoff.isoformat()),registry,now=now))
+        except (ValueError,KeyError,TypeError,TimeoutError,OSError) as exc:
+            reports.append({"symbol":symbol,"status":"DATA_OR_VALIDATION_FAILURE",
+                            "error_type":type(exc).__name__,"orders_enabled":False,"edge_proven":False})
+    return {"schema":"oracle-q-edge-lab-v1","status":"HISTORICAL_RESEARCH_ONLY",
+            "cutoff":cutoff.isoformat(),"provider":"tradier","orders_enabled":False,
+            "forward_paper_verified":False,"edge_proven":False,
+            "cost_model":"10 bps per entry or exit, open-to-next-open, unlevered long/cash",
+            "reports":reports}
+
+def main():
+    p=argparse.ArgumentParser()
+    p.add_argument("--registry",default="research/edge_registry.json")
+    p.add_argument("--output",default="edge_lab_report.json")
+    a=p.parse_args()
+    registry=json.loads(Path(a.registry).read_text())
+    report=run(registry,os.getenv("TRADIER_TOKEN",""))
+    Path(a.output).write_text(json.dumps(report,indent=2,sort_keys=True)+"\\n")
+    print("Edge lab:",[(r["symbol"],r["status"]) for r in report["reports"]])
+    if any(r["status"]!="HISTORICAL_PROXY_BACKTEST_ONLY" for r in report["reports"]):
+        raise SystemExit(1)
+
+if __name__=="__main__":
+    main()
