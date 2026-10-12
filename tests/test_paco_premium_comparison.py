@@ -25,4 +25,4 @@ class PremiumComparisonTests(unittest.TestCase):
             compare(sample(2,2.4),sample(2.5,2.9))
     def test_unmatched_contract(self):
         x=sample(2,3);x["snapshots"][0]["contracts"][0]["occ_symbol"]="OTHER"
-        self.assertEqual(compare(x,sample(2,3))["matched_contracts"],0)
+        self.assertEqual(compare(x,sample(2,3,"2026-10-10T00:00:00Z"))["matched_contracts"],0)
