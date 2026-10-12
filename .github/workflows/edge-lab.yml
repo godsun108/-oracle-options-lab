@@ -97,9 +97,9 @@ jobs:
               scorecard=Path("edge_forward_scorecard.json")
               if scorecard.exists():
                   sc=json.loads(scorecard.read_text())
-                  f.write(f"Forward scorecard: {sc.get('outcomes_total',0)} settled observations across {len(sc.get('pairs',[]))} strategy-market pairs.\\n")
+                  f.write(f"Forward scorecard: {sc.get('outcomes_total',0)} settled observations across {len(sc.get('pairs',[]))} strategy-market pairs; excluded untimed signals: {sc.get('signals_excluded_timing',0)}.\\n")
                   for pair in sc.get("pairs",[]):
-                      f.write(f"- {pair['symbol']} / {pair['strategy_id']}: {pair['outcomes_observed']} settled, {pair['pending']} pending; status: {pair['status']}\\n")
+                      f.write(f"- {pair['symbol']} / {pair['strategy_id']}: {pair['outcomes_observed']} settled, {pair['pending']} pending, {pair.get('signals_excluded_timing',0)} excluded for missing timing; status: {pair['status']}\\n")
               ledger_path=Path("edge_forward_ledger.json")
               if ledger_path.exists():
                   paper=json.loads(ledger_path.read_text())
