@@ -60,7 +60,7 @@ jobs:
               f.write("\n### Oracle-Q multi-market edge lab (read-only)\n")
               f.write("Historical backtests are not forward paper performance or verified edges.\n")
               for r in data.get("reports",[]):
-                  f.write(f"- {r.get('symbol')}: {r.get('status')}; bars: {r.get('bars','unavailable')}; diagnostic: {r.get('diagnostic',{}).get('reason','none')}\n")
+                  f.write(f"- {r.get('symbol')}: {r.get('status')}; bars: {r.get('bars','unavailable')}; diagnostic: {r.get('diagnostic',r.get('source_ohlc_diagnostic',{})).get('reason','none')}\n")
               f.write("Orders: DISABLED | Real fills: NONE | Proven profitability: NO\n")
           PY
       - name: Retain research evidence
