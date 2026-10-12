@@ -23,6 +23,8 @@ def score(ledger, *, expected_pairs=None):
     signals = defaultdict(int)
     registered = set()
     for event in events:
+        if event["type"] == "SOURCE_OPEN_CHECKPOINT":
+            continue  # Source prices are not trading signals or settled outcomes.
         key = (event["symbol"], event["strategy_id"])
         if event["type"] == "SIGNAL_REGISTERED":
             registered.add(key)
