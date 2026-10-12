@@ -212,7 +212,7 @@ jobs:
             echo "No prior successful observation artifact: bootstrap"
           fi
       - name: Create first cash observation checkpoint
-        run: python -m research.cash_observation_ledger --baseline cash_baseline.json --state cash_observation_ledger.json
+        run: python -m research.cash_observation_ledger --baseline cash_baseline.json --state cash_observation_ledger.json --conflict-evidence cash_observation_conflict.json
       - name: Report cash checkpoint continuity in Actions summary
         run: python -m research.cash_ledger_run_summary --ledger cash_observation_ledger.json --summary "$GITHUB_STEP_SUMMARY"
       - name: Produce daily focus research briefing
