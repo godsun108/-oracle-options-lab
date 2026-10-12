@@ -213,6 +213,21 @@ jobs:
           fi
       - name: Create first cash observation checkpoint
         run: python -m research.cash_observation_ledger --baseline cash_baseline.json --state cash_observation_ledger.json --conflict-evidence cash_observation_conflict.json
+      - name: Report preserved same-day cash conflict
+        if: always()
+        run: |
+          if [ -s cash_observation_conflict.json ]; then
+            python - <<'PY'
+          import json, os
+          from pathlib import Path
+          evidence=json.loads(Path("cash_observation_conflict.json").read_text())
+          assert evidence["status"] == "SAME_DAY_CONFLICT_PRESERVED"
+          with open(os.environ["GITHUB_STEP_SUMMARY"],"a") as out:
+              out.write("\\n### Cash checkpoint conflict (preserved)\\n")
+              out.write("Same-day source hashes differ; historical ledger remains unchanged.\\n")
+              out.write("No additional cash performance or trades inferred.\\n")
+          PY
+          fi
       - name: Report cash checkpoint continuity in Actions summary
         run: python -m research.cash_ledger_run_summary --ledger cash_observation_ledger.json --summary "$GITHUB_STEP_SUMMARY"
       - name: Produce daily focus research briefing
@@ -372,6 +387,7 @@ jobs:
             feed_evidence.json
             cash_baseline.json
             cash_observation_ledger.json
+            cash_observation_conflict.json
             paco_option_chain_snapshots.json
             paco_auth_diagnostic.json
             paco_snapshot_continuity.json
