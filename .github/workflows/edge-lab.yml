@@ -100,6 +100,10 @@ jobs:
                   f.write(f"Forward scorecard: {sc.get('outcomes_total',0)} settled observations across {len(sc.get('pairs',[]))} strategy-market pairs.\\n")
                   for pair in sc.get("pairs",[]):
                       f.write(f"- {pair['symbol']} / {pair['strategy_id']}: {pair['outcomes_observed']} settled, {pair['pending']} pending; status: {pair['status']}\\n")
+              ledger_path=Path("edge_forward_ledger.json")
+              if ledger_path.exists():
+                  paper=json.loads(ledger_path.read_text())
+                  f.write(f"Hash-linked source open checkpoints: {paper.get('open_checkpoints_recorded','legacy ledger')}\\n")
               f.write("Orders: DISABLED | Real fills: NONE | Proven profitability: NO\n")
           PY
       - name: Retain research evidence
