@@ -85,7 +85,7 @@ def main():
         }
         target=Path(args.conflict_evidence)
         target.parent.mkdir(parents=True,exist_ok=True)
-        target.write_text(json.dumps(evidence,sort_keys=True,indent=2)+"\\n")
+        target.write_text(json.dumps(evidence,sort_keys=True,indent=2)+chr(10))
         print("Cash checkpoint same-day conflict preserved; existing chain unchanged")
         return
     path.parent.mkdir(parents=True,exist_ok=True)
