@@ -11,7 +11,7 @@ from pathlib import Path
 
 from research.edge_forward_paper import verify, parse_utc_timestamp, session_open_utc
 
-from research.edge_session_calendar import expected_entry_exit
+from research.edge_session_calendar import expected_entry_exit, eligible_cutoff
 
 TOLERANCE_PCT = 0.000002
 
@@ -30,6 +30,18 @@ def audit(ledger):
         counts[kind] += 1
         if event.get("orders_enabled") is not False or event.get("fill_verified") is not False:
             raise ValueError("paper event claims real order or fill")
+        if "source_observed_at" in event:
+            source_time = parse_utc_timestamp(event["source_observed_at"])
+            cutoff = eligible_cutoff(source_time).isoformat()
+            if kind == "SOURCE_OPEN_CHECKPOINT" and event["open_date"] > cutoff:
+                raise ValueError("source timestamp precedes eligible price session")
+            if kind == "SIGNAL_REGISTERED":
+                if "registered_at" not in event:
+                    raise ValueError("legacy untimed signal has incompatible source timestamp")
+                if event["signal_date"] != cutoff or source_time > parse_utc_timestamp(event["registered_at"]):
+                    raise ValueError("source timestamp incompatible with signal registration")
+            if kind == "PAPER_OUTCOME_OBSERVED" and event["exit_date"] > cutoff:
+                raise ValueError("source timestamp precedes eligible outcome session")
         if kind == "SOURCE_OPEN_CHECKPOINT":
             key = (event["symbol"], event["open_date"])
             price = event["open_price"]

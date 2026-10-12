@@ -10,6 +10,8 @@ on:
       - 'research/edge_session_calendar.py'
       - 'research/edge_session_calendar.json'
       - 'tests/test_edge_session_calendar.py'
+      - 'research/edge_execution_sensitivity.py'
+      - 'tests/test_edge_execution_sensitivity.py'
       - 'research/edge_lab.py'
       - 'research/edge_forward_paper.py'
       - 'research/edge_forward_scorecard.py'
@@ -29,6 +31,8 @@ on:
       - "research/edge_session_calendar.py"
       - "research/edge_session_calendar.json"
       - "tests/test_edge_session_calendar.py"
+      - "research/edge_execution_sensitivity.py"
+      - "tests/test_edge_execution_sensitivity.py"
       - "research/edge_lab.py"
       - "research/edge_forward_paper.py"
       - "research/edge_forward_scorecard.py"
@@ -62,7 +66,7 @@ jobs:
         with:
           python-version: "3.11"
       - name: Verify pre-registered edge lab research
-        run: python -m unittest tests.test_edge_lab tests.test_edge_forward_paper tests.test_edge_forward_scorecard tests.test_edge_forward_integrity_audit tests.test_edge_forward_uncertainty tests.test_edge_evidence_restore tests.test_edge_session_calendar -v
+        run: python -m unittest tests.test_edge_lab tests.test_edge_forward_paper tests.test_edge_forward_scorecard tests.test_edge_forward_integrity_audit tests.test_edge_forward_uncertainty tests.test_edge_evidence_restore tests.test_edge_session_calendar tests.test_edge_execution_sensitivity -v
 
   research:
     if: github.event_name != 'pull_request'
@@ -90,6 +94,8 @@ jobs:
         run: python -m research.edge_evidence_restore --prior edge-restore/edge_forward_ledger.json --current edge_forward_ledger.json --output edge_forward_continuity.json
       - name: Score paired delayed forward paper outcomes
         run: python -m research.edge_forward_scorecard --ledger edge_forward_ledger.json --report edge_lab_report.json --output edge_forward_scorecard.json
+      - name: Stress fixed hypothetical execution costs
+        run: python -m research.edge_execution_sensitivity --ledger edge_forward_ledger.json --output edge_execution_sensitivity.json
       - name: Summarize research without promoting historical backtests to proven edges
         if: always()
         run: |
@@ -129,6 +135,7 @@ jobs:
             edge_forward_ledger.json
             edge_forward_scorecard.json
             edge_forward_integrity_audit.json
+            edge_execution_sensitivity.json
             edge_forward_continuity.json
             edge-restore/edge_restore_manifest.json
           if-no-files-found: warn
