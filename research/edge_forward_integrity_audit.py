@@ -11,6 +11,8 @@ from pathlib import Path
 
 from research.edge_forward_paper import verify, parse_utc_timestamp, session_open_utc
 
+from research.edge_session_calendar import expected_entry_exit
+
 TOLERANCE_PCT = 0.000002
 
 def _finite_positive(value):
@@ -70,6 +72,8 @@ def audit(ledger):
             raise ValueError("invalid entry/exit chronology")
         if session_open_utc(entry_day) <= registered_at:
             raise ValueError("retroactive opening price used as entry")
+        if (entry_day, exit_day) != expected_entry_exit(key[2], registered_at):
+            raise ValueError("outcome skips required exchange session")
         candidates = sorted(day for (symbol,day) in opens
                             if symbol == key[0] and day > key[2] and session_open_utc(day) > registered_at)
         if len(candidates) < 2 or candidates[:2] != [entry_day, exit_day]:

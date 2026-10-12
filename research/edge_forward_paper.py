@@ -3,9 +3,9 @@ import argparse
 import hashlib
 import json
 import math
-from datetime import datetime, date, time, timezone
-from zoneinfo import ZoneInfo
+from datetime import datetime, timezone
 from pathlib import Path
+from research.edge_session_calendar import session_bounds, expected_entry_exit, validate_sequence, CALENDAR_SHA256
 
 def digest(value):
     return hashlib.sha256(json.dumps(value,sort_keys=True,separators=(",",":"),allow_nan=False).encode()).hexdigest()
@@ -40,16 +40,15 @@ def parse_utc_timestamp(value):
     return stamp.astimezone(timezone.utc)
 
 def session_open_utc(day):
-    """US ETF research proxy opening bell, not a complete exchange calendar."""
-    parsed=date.fromisoformat(day)
-    if parsed.weekday()>=5:
-        raise ValueError("weekend open is invalid")
-    return datetime.combine(parsed,time(9,30),tzinfo=ZoneInfo("America/New_York")).astimezone(timezone.utc)
+    return session_bounds(day)[0]
 
-def advance(previous,current):
+def advance(previous,current, *, registered_at=None):
     if current.get("schema")!="oracle-q-edge-lab-v1" or current.get("orders_enabled") is not False or current.get("edge_proven") is not False:
         raise ValueError("untrusted research report")
     observed_at=parse_utc_timestamp(current.get("observed_at"))
+    registration = parse_utc_timestamp(registered_at) if registered_at else observed_at
+    if registration < observed_at:
+        raise ValueError("registration precedes source observation")
     reports=current.get("reports")
     if not isinstance(reports,list) or not reports:
         raise ValueError("no market reports")
@@ -102,11 +101,13 @@ def advance(previous,current):
         for row in dates:
             day=row["time"]
             price=row["open"]
-            if day in opens or not isinstance(price,(float,int)) or not math.isfinite(price) or price<=0:
+            if day in opens or not isinstance(price,(float,int)) or isinstance(price,bool) or not math.isfinite(price) or price<=0:
                 raise ValueError("invalid recent open evidence")
             opens[day]=price
         if list(opens)!=sorted(opens) or report["last_completed_date"]!=dates[-1]["time"]:
             raise ValueError("recent open chronology mismatch")
+        validate_sequence(list(opens), now=observed_at, require_fresh=True)
+        validate_sequence(list(opens), now=registration, require_fresh=True)
         # Check every previously observed opening price before recording new evidence.
         # A vendor adjustment or correction must be investigated explicitly, not
         # silently allowed to rewrite forward paper outcome assumptions.
@@ -119,6 +120,8 @@ def advance(previous,current):
             if key not in checkpoints:
                 add({"type":"SOURCE_OPEN_CHECKPOINT","symbol":symbol,
                      "open_date":day,"open_price":price,
+                     "source_observed_at":observed_at.isoformat(),
+                     "calendar_sha256":CALENDAR_SHA256,
                      "source_report_sha256":source_sha,
                      "checkpoint_class":"SOURCE_PRICE_OBSERVATION_NOT_FORWARD_SIGNAL",
                      "orders_enabled":False,"fill_verified":False})
@@ -132,7 +135,9 @@ def advance(previous,current):
             if key not in registered:
                 event={"type":"SIGNAL_REGISTERED","symbol":symbol,"strategy_id":sid,
                        "signal_date":key[2],"signal":wanted,
-                       "registered_at":observed_at.isoformat(),
+                       "registered_at":registration.isoformat(),
+                       "source_observed_at":observed_at.isoformat(),
+                       "calendar_sha256":CALENDAR_SHA256,
                        "source_report_sha256":source_sha,
                        "orders_enabled":False,"fill_verified":False}
                 add(event)
@@ -152,14 +157,12 @@ def advance(previous,current):
             registered_at=parse_utc_timestamp(original["registered_at"])
             # Entry must be strictly AFTER signal registration; do not assume
             # a historical bar's open was tradeable when registration came later.
-            eligible=[(day,price) for day,price in opens.items()
-                      if day>key[2] and session_open_utc(day)>registered_at]
-            if len(eligible)<2:
+            entry_date,exit_date=expected_entry_exit(key[2],registered_at)
+            if exit_date > report["last_completed_date"]:
                 continue
-            entry_date,entry_open=eligible[0]
-            exit_date,exit_open=eligible[1]
-            if session_open_utc(entry_date)<=registered_at:
-                raise ValueError("retroactive paper entry blocked")
+            if entry_date not in opens or exit_date not in opens:
+                raise ValueError("MISSING_REQUIRED_FORWARD_OPEN")
+            entry_open,exit_open=opens[entry_date],opens[exit_date]
             direction=original["signal"]
             result=direction*(exit_open/entry_open-1)
             if direction:
@@ -167,6 +170,8 @@ def advance(previous,current):
             benchmark=(exit_open/entry_open-1)-0.002
             add({"type":"PAPER_OUTCOME_OBSERVED","symbol":symbol,"strategy_id":key[1],
                  "signal_date":key[2],"entry_date":entry_date,"exit_date":exit_date,
+                 "source_observed_at":observed_at.isoformat(),
+                 "calendar_sha256":CALENDAR_SHA256,
                  "hypothetical_net_return_pct":round(result*100,6),
                  "hypothetical_buy_hold_return_pct":round(benchmark*100,6),
                  "hypothetical_excess_vs_buy_hold_pct":round((result-benchmark)*100,6),
@@ -191,7 +196,7 @@ def main():
     a=p.parse_args()
     current=json.loads(Path(a.current).read_text())
     prior=json.loads(Path(a.prior).read_text()) if a.prior else None
-    result=advance(prior,current)
+    result=advance(prior,current,registered_at=datetime.now(timezone.utc).isoformat())
     Path(a.output).write_text(json.dumps(result,indent=2,sort_keys=True)+"\n")
     print("Forward paper observations:",result["signals_registered"],"registered;",
           result["outcomes_observed"],"observed; pending:",result["pending_signals"])

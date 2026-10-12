@@ -4,7 +4,7 @@ from research.edge_forward_paper import advance,verify
 
 def report(day,opens):
     return {"schema":"oracle-q-edge-lab-v1","orders_enabled":False,"edge_proven":False,
-            "observed_at":day+"T20:00:00+00:00",
+            "observed_at":day+"T21:00:00+00:00",
             "reports":[{"symbol":"SPY","status":"HISTORICAL_OPEN_PROXY_BACKTEST_ONLY",
                         "price_field":"open_only","last_completed_date":day,
                         "recent_opens":[{"time":d,"open":p} for d,p in opens],
