@@ -9,6 +9,8 @@ on:
     paths:
       - "research/edge_registry.json"
       - "research/edge_lab.py"
+      - "research/edge_forward_paper.py"
+      - "tests/test_edge_forward_paper.py"
       - "tests/test_edge_lab.py"
       - ".github/workflows/edge-lab.yml"
   workflow_dispatch:
@@ -17,6 +19,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: oracle-q-edge-lab
@@ -32,7 +35,7 @@ jobs:
         with:
           python-version: "3.11"
       - name: Verify pre-registered edge lab research
-        run: python -m unittest tests.test_edge_lab -v
+        run: python -m unittest tests.test_edge_lab tests.test_edge_forward_paper -v
 
   research:
     if: github.event_name != 'pull_request'
@@ -48,6 +51,32 @@ jobs:
         env:
           TRADIER_TOKEN: ${{ secrets.TRADIER_TOKEN }}
         run: python -m research.edge_lab --registry research/edge_registry.json --output edge_lab_report.json
+      - name: Restore previous hash-linked forward paper observations
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p edge-restore
+          PREVIOUS=$(gh run list --repo "${{ github.repository }}" --workflow edge-lab.yml --branch main --status success --limit 30 --json databaseId --jq '.[].databaseId' | while read -r id; do
+            if [ "$id" != "${{ github.run_id }}" ]; then
+              if gh api "repos/${{ github.repository }}/actions/runs/$id/artifacts" --jq '.artifacts[].name' | grep -Fxq "oracle-edge-lab-$id"; then
+                echo "$id"
+                break
+              fi
+            fi
+          done)
+          if [ -n "$PREVIOUS" ]; then
+            gh run download "$PREVIOUS" --repo "${{ github.repository }}" --name "oracle-edge-lab-$PREVIOUS" --dir edge-restore
+            if [ -s edge-restore/edge_forward_ledger.json ]; then
+              echo "Restored forward paper ledger from $PREVIOUS"
+            else
+              echo "Prior edge report predates forward ledger; starting ledger genesis"
+            fi
+          else
+            echo "No prior successful edge lab artifact; starting ledger genesis"
+          fi
+      - name: Append and settle delayed forward paper observations
+        run: python -m research.edge_forward_paper --current edge_lab_report.json --prior edge-restore/edge_forward_ledger.json --output edge_forward_ledger.json
       - name: Summarize research without promoting historical backtests to proven edges
         if: always()
         run: |
@@ -68,6 +97,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: oracle-edge-lab-${{ github.run_id }}
-          path: edge_lab_report.json
+          path: |
+            edge_lab_report.json
+            edge_forward_ledger.json
           if-no-files-found: warn
           retention-days: 30

@@ -104,6 +104,7 @@ def evaluate(symbol, raw, registry, *, now=None):
             "train_start":bars[first]["time"],"holdout_start":bars[split]["time"],
             "holdout_end":bars[stop]["time"],"open_series_sha256":payload_hash,"price_field":"open_only",
             "source_ohlc_diagnostic":source_ohlc_diagnostic,
+            "recent_opens":bars[-25:],
             "close_ohlc_validation":"NOT_USED_IN_OPEN_ONLY_MODEL",
             "strategies":rows,"orders_enabled":False,"forward_paper_verified":False,
             "edge_proven":False,"warnings":["Open-only signals lag completed opening prices and do not replicate close-based published strategies.",
