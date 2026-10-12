@@ -4,20 +4,21 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from research.edge_lab import signal, segment, evaluate, run, diagnose_raw_bars, validate_open_bars
 
+from research.edge_session_calendar import is_session
+
 REGISTRY=json.loads(Path("research/edge_registry.json").read_text())
 NOW=datetime(2026,10,12,22,0,tzinfo=timezone.utc)
 
 def bars(n=420):
-    start=datetime(2025,1,1,tzinfo=timezone.utc)
-    out=[]
-    day=start
-    while len(out)<n:
-        if day.weekday()<5:
-            v=100+len(out)*0.15
-            out.append({"date":day.date().isoformat(),"open":v,"high":v+1,
-                        "low":v-1,"close":v+0.05})
-        day+=timedelta(days=1)
-    return out
+    sessions=[]
+    day=NOW
+    while len(sessions)<n:
+        if is_session(day.date()):
+            sessions.append(day.date().isoformat())
+        day-=timedelta(days=1)
+    return [{"date":day,"open":100+i*.15,"high":101+i*.15,
+             "low":99+i*.15,"close":100.05+i*.15}
+            for i,day in enumerate(reversed(sessions))]
 
 class EdgeLabTests(unittest.TestCase):
     def test_signals_use_prior_completed_closes(self):

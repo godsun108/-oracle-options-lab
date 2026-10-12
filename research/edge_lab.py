@@ -5,8 +5,9 @@ import json
 import math
 import os
 from pathlib import Path
-from research.multi_market_observer import SYMBOLS, eligible_cutoff, request_history
+from research.multi_market_observer import SYMBOLS, request_history
 from datetime import date, datetime, timezone
+from research.edge_session_calendar import eligible_cutoff, is_session, validate_sequence, CALENDAR_SHA256
 
 WARMUP = 200
 COST_PER_SIDE = 0.001  # conservative 10 basis points on each position transition
@@ -66,7 +67,7 @@ def validate_open_bars(rows, *, now=None):
             day=date.fromisoformat(str(row["date"])[:10])
             if day>cutoff:
                 continue
-            if day.weekday()>=5 or day.isoformat() in found:
+            if not is_session(day) or day.isoformat() in found:
                 raise ValueError("weekend or duplicate open observation")
             price=float(row["open"])
             if not math.isfinite(price) or price<=0:
@@ -74,6 +75,8 @@ def validate_open_bars(rows, *, now=None):
             found[day.isoformat()]=price
         except (KeyError,TypeError,ValueError,OverflowError) as exc:
             raise ValueError("invalid open observation") from exc
+    if found:
+        validate_sequence(sorted(found))
     return [{"time":day,"open":price} for day,price in sorted(found.items())]
 
 def evaluate(symbol, raw, registry, *, now=None):
@@ -84,6 +87,7 @@ def evaluate(symbol, raw, registry, *, now=None):
     if len(bars) < 320:
         return {"symbol":symbol,"status":"INSUFFICIENT_COMPLETED_BARS",
                 "bars":len(bars),"orders_enabled":False,"edge_proven":False}
+    validate_sequence([b["time"] for b in bars], now=now, require_fresh=True)
     # The last bar is only used for a *future* signal; no next-open price is available.
     first = WARMUP
     stop = len(bars)-1
@@ -149,6 +153,7 @@ def run(registry, token, *, fetch=request_history, now=None):
         raise ValueError("registered backtest strategies do not match implementation")
     if not token:
         raise ValueError("missing read-only data credential")
+    now = now or datetime.now(timezone.utc)
     cutoff=eligible_cutoff(now)
     start=(cutoff-__import__("datetime").timedelta(days=850)).isoformat()
     reports=[]
@@ -156,7 +161,11 @@ def run(registry, token, *, fetch=request_history, now=None):
         raw=None
         try:
             raw=fetch(symbol,token,start,cutoff.isoformat())
-            reports.append(evaluate(symbol,raw,registry,now=now))
+            received_at=datetime.now(timezone.utc).isoformat()
+            evaluated=evaluate(symbol,raw,registry,now=now)
+            evaluated["source_received_at"]=received_at
+            evaluated["source_payload_sha256"]=hashlib.sha256(json.dumps(raw,sort_keys=True,separators=(",",":"),allow_nan=False).encode()).hexdigest()
+            reports.append(evaluated)
         except (ValueError,KeyError,TypeError,TimeoutError,OSError) as exc:
             detail=diagnose_raw_bars(raw,now=now) if raw is not None else {"reason":"FETCH_UNAVAILABLE"}
             reports.append({"symbol":symbol,"status":"DATA_OR_VALIDATION_FAILURE",
@@ -164,6 +173,7 @@ def run(registry, token, *, fetch=request_history, now=None):
                             "orders_enabled":False,"edge_proven":False})
     return {"schema":"oracle-q-edge-lab-v1","status":"HISTORICAL_RESEARCH_ONLY",
             "observed_at":datetime.now(timezone.utc).isoformat(),
+            "calendar_sha256":CALENDAR_SHA256,
             "cutoff":cutoff.isoformat(),"provider":"tradier","orders_enabled":False,
             "forward_paper_verified":False,"edge_proven":False,
             "cost_model":"10 bps per entry or exit, open-to-next-open, unlevered long/cash",
