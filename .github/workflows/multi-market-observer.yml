@@ -389,6 +389,7 @@ jobs:
             cash_observation_ledger.json
             cash_observation_conflict.json
             paco_option_chain_snapshots.json
+            paco_snapshot_continuity.json
             paco_auth_diagnostic.json
             paco_snapshot_continuity.json
             paco_premium_comparison.json
