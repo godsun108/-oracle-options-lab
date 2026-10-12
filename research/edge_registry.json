@@ -1,0 +1,100 @@
+{
+  "schema": "oracle-q-edge-registry-v1",
+  "research_status": "PUBLISHED_HYPOTHESES_NOT_PROVEN_IN_THIS_SYSTEM",
+  "enabled_for_execution": false,
+  "proxy_symbols": [
+    "SPY",
+    "QQQ",
+    "IWM",
+    "SMH",
+    "TLT",
+    "GLD"
+  ],
+  "candidates": [
+    {
+      "id": "tsmom_63",
+      "family": "time_series_momentum",
+      "markets": [
+        "equities",
+        "bonds",
+        "commodities",
+        "fx"
+      ],
+      "implementation": "long_only_63_trading_day_return_proxy",
+      "source": "https://doi.org/10.1016/j.jfineco.2011.11.003",
+      "testable_with_current_etf_data": true,
+      "warning": "ETF long-only implementation differs from diversified long-short futures study."
+    },
+    {
+      "id": "trend_200",
+      "family": "trend_following",
+      "markets": [
+        "equities",
+        "bonds",
+        "commodities",
+        "fx"
+      ],
+      "implementation": "long_only_close_above_200_day_average_proxy",
+      "source": "https://www.aqr.com/Insights/Research/Journal-Article/A-Century-of-Evidence-on-Trend-Following-Investing",
+      "testable_with_current_etf_data": true,
+      "warning": "200-day ETF proxy is not a replication of the cited managed-futures strategy."
+    },
+    {
+      "id": "reversal_5",
+      "family": "short_term_reversal",
+      "markets": [
+        "equities"
+      ],
+      "implementation": "long_only_five_day_decline_proxy",
+      "source": "https://doi.org/10.1111/j.1540-6261.1990.tb05110.x",
+      "testable_with_current_etf_data": true,
+      "warning": "Five-day ETF proxy differs from published individual-stock reversal portfolios."
+    },
+    {
+      "id": "cross_asset_carry",
+      "family": "carry",
+      "markets": [
+        "fx",
+        "bonds",
+        "commodities",
+        "options"
+      ],
+      "source": "https://doi.org/10.1016/j.jfineco.2017.11.002",
+      "testable_with_current_etf_data": false,
+      "missing_data": [
+        "futures term structure",
+        "rates",
+        "financing and roll costs"
+      ]
+    },
+    {
+      "id": "value_quality",
+      "family": "value_profitability",
+      "markets": [
+        "equities"
+      ],
+      "source": "https://doi.org/10.1016/j.jfineco.2014.10.010",
+      "testable_with_current_etf_data": false,
+      "missing_data": [
+        "point-in-time fundamentals",
+        "survivorship-free universe"
+      ]
+    },
+    {
+      "id": "cross_sectional_value_momentum",
+      "family": "value_momentum",
+      "markets": [
+        "equities",
+        "bonds",
+        "currencies",
+        "commodities"
+      ],
+      "source": "https://doi.org/10.1111/jofi.12021",
+      "testable_with_current_etf_data": false,
+      "missing_data": [
+        "cross-sectional universe",
+        "point-in-time valuation inputs"
+      ]
+    }
+  ]
+}
