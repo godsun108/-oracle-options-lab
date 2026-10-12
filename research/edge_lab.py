@@ -85,6 +85,35 @@ def evaluate(symbol, raw, registry, *, now=None):
               "Corporate actions, financing, borrow, taxes, and data adjustments are not independently verified.",
               "No actual fills, live orders, or statistical edge established."]}
 
+def diagnose_raw_bars(rows, *, now=None):
+    """Explain blocked input without silently discarding bad market observations."""
+    if not isinstance(rows,list):
+        return {"reason":"NOT_A_LIST"}
+    cutoff=eligible_cutoff(now)
+    seen=set()
+    for row in rows:
+        if not isinstance(row,dict):
+            return {"reason":"NON_OBJECT_BAR"}
+        day=str(row.get("date",""))[:10]
+        try:
+            from datetime import date
+            parsed=date.fromisoformat(day)
+            if parsed>cutoff:
+                continue
+            if parsed.weekday()>=5:
+                return {"reason":"WEEKEND_BAR","date":day}
+            if day in seen:
+                return {"reason":"DUPLICATE_BAR","date":day}
+            seen.add(day)
+            o,h,l,c=[float(row[k]) for k in ("open","high","low","close")]
+            if not all(math.isfinite(x) and x>0 for x in (o,h,l,c)):
+                return {"reason":"NONFINITE_OR_NONPOSITIVE_OHLC","date":day}
+            if not l<=min(o,c)<=max(o,c)<=h:
+                return {"reason":"INCONSISTENT_OHLC","date":day}
+        except (KeyError,TypeError,ValueError,OverflowError):
+            return {"reason":"MALFORMED_OHLC","date":day}
+    return {"reason":"DOWNSTREAM_VALIDATION_FAILURE"}
+
 def run(registry, token, *, fetch=request_history, now=None):
     if registry.get("schema") != "oracle-q-edge-registry-v1" or registry.get("enabled_for_execution") is not False:
         raise ValueError("invalid research-only edge registry")
@@ -96,11 +125,15 @@ def run(registry, token, *, fetch=request_history, now=None):
     start=(cutoff-__import__("datetime").timedelta(days=850)).isoformat()
     reports=[]
     for symbol in registry["proxy_symbols"]:
+        raw=None
         try:
-            reports.append(evaluate(symbol,fetch(symbol,token,start,cutoff.isoformat()),registry,now=now))
+            raw=fetch(symbol,token,start,cutoff.isoformat())
+            reports.append(evaluate(symbol,raw,registry,now=now))
         except (ValueError,KeyError,TypeError,TimeoutError,OSError) as exc:
+            detail=diagnose_raw_bars(raw,now=now) if raw is not None else {"reason":"FETCH_UNAVAILABLE"}
             reports.append({"symbol":symbol,"status":"DATA_OR_VALIDATION_FAILURE",
-                            "error_type":type(exc).__name__,"orders_enabled":False,"edge_proven":False})
+                            "error_type":type(exc).__name__,"diagnostic":detail,
+                            "orders_enabled":False,"edge_proven":False})
     return {"schema":"oracle-q-edge-lab-v1","status":"HISTORICAL_RESEARCH_ONLY",
             "cutoff":cutoff.isoformat(),"provider":"tradier","orders_enabled":False,
             "forward_paper_verified":False,"edge_proven":False,
