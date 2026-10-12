@@ -21,6 +21,7 @@ def score(ledger, *, expected_pairs=None):
     events = verify(ledger)
     groups = defaultdict(list)
     signals = defaultdict(int)
+    exclusions = defaultdict(int)
     registered = set()
     for event in events:
         if event["type"] == "SOURCE_OPEN_CHECKPOINT":
@@ -31,6 +32,8 @@ def score(ledger, *, expected_pairs=None):
             signals[key] += 1
         elif event["type"] == "PAPER_OUTCOME_OBSERVED":
             groups[key].append(event)
+        elif event["type"] == "SIGNAL_EXCLUDED_TIMING":
+            exclusions[key] += 1
     if expected_pairs is not None:
         expected = set(tuple(pair) for pair in expected_pairs)
         if registered - expected:
@@ -69,7 +72,9 @@ def score(ledger, *, expected_pairs=None):
         results.append({
             "symbol":symbol, "strategy_id":strategy_id,
             "signals_registered":signals[(symbol,strategy_id)],
-            "outcomes_observed":n, "pending":signals[(symbol,strategy_id)]-n,
+            "outcomes_observed":n,
+            "signals_excluded_timing":exclusions[(symbol,strategy_id)],
+            "pending":signals[(symbol,strategy_id)]-n-exclusions[(symbol,strategy_id)],
             "paired_benchmark_observations":paired,
             "mean_hypothetical_return_pct":_mean(returns),
             "median_hypothetical_return_pct":round(statistics.median(returns),6) if n else None,
@@ -86,6 +91,7 @@ def score(ledger, *, expected_pairs=None):
         "status":"FORWARD_PAPER_RESEARCH_ONLY",
         "minimum_outcomes_for_review":MIN_OUTCOMES_FOR_REVIEW,
         "outcomes_total":sum(row["outcomes_observed"] for row in results),
+        "signals_excluded_timing":sum(row["signals_excluded_timing"] for row in results),
         "pairs":results, "orders_enabled":False, "fill_verified":False,
         "edge_proven":False, "eligible_for_live_trading":False,
         "limitations":[
