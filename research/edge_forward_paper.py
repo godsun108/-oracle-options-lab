@@ -95,9 +95,12 @@ def advance(previous,current):
             result=direction*(exit_open/entry_open-1)
             if direction:
                 result-=0.002  # two 10bps hypothetical transitions
+            benchmark=(exit_open/entry_open-1)-0.002
             add({"type":"PAPER_OUTCOME_OBSERVED","symbol":symbol,"strategy_id":key[1],
                  "signal_date":key[2],"entry_date":entry_date,"exit_date":exit_date,
                  "hypothetical_net_return_pct":round(result*100,6),
+                 "hypothetical_buy_hold_return_pct":round(benchmark*100,6),
+                 "hypothetical_excess_vs_buy_hold_pct":round((result-benchmark)*100,6),
                  "source_report_sha256":source_sha,
                  "orders_enabled":False,"fill_verified":False})
             settled.add(key)
