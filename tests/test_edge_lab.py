@@ -2,7 +2,7 @@ import json
 import unittest
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from research.edge_lab import signal, segment, evaluate, run, diagnose_raw_bars
+from research.edge_lab import signal, segment, evaluate, run, diagnose_raw_bars, validate_open_bars
 
 REGISTRY=json.loads(Path("research/edge_registry.json").read_text())
 NOW=datetime(2026,10,12,22,0,tzinfo=timezone.utc)
@@ -32,13 +32,14 @@ class EdgeLabTests(unittest.TestCase):
         self.assertLess(r["net_return_pct"],0)
     def test_historical_holdout_never_proves_edge(self):
         result=evaluate("SPY",bars(),REGISTRY,now=NOW)
-        self.assertEqual(result["status"],"HISTORICAL_PROXY_BACKTEST_ONLY")
+        self.assertEqual(result["status"],"HISTORICAL_OPEN_PROXY_BACKTEST_ONLY")
         self.assertEqual(len(result["strategies"]),3)
         self.assertFalse(result["forward_paper_verified"])
         self.assertFalse(result["edge_proven"])
         self.assertLess(result["train_start"],result["holdout_start"])
         self.assertLess(result["holdout_start"],result["holdout_end"])
-        self.assertEqual(len(result["ohlc_sha256"]),64)
+        self.assertEqual(len(result["open_series_sha256"]),64)
+        self.assertEqual(result["price_field"],"open_only")
     def test_insufficient_history_fails_closed(self):
         r=evaluate("SPY",bars(250),REGISTRY,now=NOW)
         self.assertEqual(r["status"],"INSUFFICIENT_COMPLETED_BARS")
@@ -52,8 +53,15 @@ class EdgeLabTests(unittest.TestCase):
         d=diagnose_raw_bars(raw,now=NOW)
         self.assertEqual(d["reason"],"INCONSISTENT_OHLC")
         r=run(REGISTRY,"token",fetch=lambda *args:raw,now=NOW)
-        self.assertEqual(r["reports"][0]["status"],"DATA_OR_VALIDATION_FAILURE")
-        self.assertEqual(r["reports"][0]["diagnostic"]["reason"],"INCONSISTENT_OHLC")
+        self.assertEqual(r["reports"][0]["status"],"HISTORICAL_OPEN_PROXY_BACKTEST_ONLY")
+        self.assertEqual(r["reports"][0]["price_field"],"open_only")
+        self.assertFalse(r["edge_proven"])
+    def test_invalid_open_still_blocks_market(self):
+        raw=bars(330)
+        raw[12]["open"]=float("nan")
+        self.assertRaises(ValueError,validate_open_bars,raw,now=NOW)
+        r=run(REGISTRY,"token",fetch=lambda *args:raw,now=NOW)
+        self.assertTrue(all(x["status"]=="DATA_OR_VALIDATION_FAILURE" for x in r["reports"]))
         self.assertFalse(r["edge_proven"])
     def test_unregistered_symbol_rejected(self):
         with self.assertRaises(ValueError):
