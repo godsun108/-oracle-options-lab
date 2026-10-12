@@ -2,7 +2,7 @@ import json
 import unittest
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from research.edge_lab import signal, segment, evaluate, run
+from research.edge_lab import signal, segment, evaluate, run, diagnose_raw_bars
 
 REGISTRY=json.loads(Path("research/edge_registry.json").read_text())
 NOW=datetime(2026,10,12,22,0,tzinfo=timezone.utc)
@@ -45,6 +45,15 @@ class EdgeLabTests(unittest.TestCase):
     def test_no_data_not_marked_as_edge(self):
         r=run(REGISTRY,"read-only-token",fetch=lambda *args:[],now=NOW)
         self.assertTrue(all(x["status"]=="INSUFFICIENT_COMPLETED_BARS" for x in r["reports"]))
+        self.assertFalse(r["edge_proven"])
+    def test_inconsistent_ohlc_identified_without_repair(self):
+        raw=bars(330)
+        raw[12]["close"]=raw[12]["high"]+5
+        d=diagnose_raw_bars(raw,now=NOW)
+        self.assertEqual(d["reason"],"INCONSISTENT_OHLC")
+        r=run(REGISTRY,"token",fetch=lambda *args:raw,now=NOW)
+        self.assertEqual(r["reports"][0]["status"],"DATA_OR_VALIDATION_FAILURE")
+        self.assertEqual(r["reports"][0]["diagnostic"]["reason"],"INCONSISTENT_OHLC")
         self.assertFalse(r["edge_proven"])
     def test_unregistered_symbol_rejected(self):
         with self.assertRaises(ValueError):
