@@ -1,6 +1,10 @@
 name: Multi-market edge research lab (paper only)
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/edge-lab.yml'
   pull_request:
     paths:
       - "research/edge_registry.json"
