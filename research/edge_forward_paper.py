@@ -190,7 +190,7 @@ def main():
     p.add_argument("--output",required=True)
     a=p.parse_args()
     current=json.loads(Path(a.current).read_text())
-    prior=json.loads(Path(a.prior).read_text()) if a.prior and Path(a.prior).exists() else None
+    prior=json.loads(Path(a.prior).read_text()) if a.prior else None
     result=advance(prior,current)
     Path(a.output).write_text(json.dumps(result,indent=2,sort_keys=True)+"\n")
     print("Forward paper observations:",result["signals_registered"],"registered;",

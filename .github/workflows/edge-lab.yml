@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/edge-lab.yml'
+      - 'research/edge_evidence_restore.py'
+      - 'tests/test_edge_evidence_restore.py'
       - 'research/edge_lab.py'
       - 'research/edge_forward_paper.py'
       - 'research/edge_forward_scorecard.py'
@@ -19,6 +21,8 @@ on:
   pull_request:
     paths:
       - "research/edge_registry.json"
+      - "research/edge_evidence_restore.py"
+      - "tests/test_edge_evidence_restore.py"
       - "research/edge_lab.py"
       - "research/edge_forward_paper.py"
       - "research/edge_forward_scorecard.py"
@@ -52,7 +56,7 @@ jobs:
         with:
           python-version: "3.11"
       - name: Verify pre-registered edge lab research
-        run: python -m unittest tests.test_edge_lab tests.test_edge_forward_paper tests.test_edge_forward_scorecard tests.test_edge_forward_integrity_audit tests.test_edge_forward_uncertainty -v
+        run: python -m unittest tests.test_edge_lab tests.test_edge_forward_paper tests.test_edge_forward_scorecard tests.test_edge_forward_integrity_audit tests.test_edge_forward_uncertainty tests.test_edge_evidence_restore -v
 
   research:
     if: github.event_name != 'pull_request'
@@ -71,31 +75,13 @@ jobs:
       - name: Restore previous hash-linked forward paper observations
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          mkdir -p edge-restore
-          PREVIOUS=$(gh run list --repo "${{ github.repository }}" --workflow edge-lab.yml --branch main --status success --limit 30 --json databaseId --jq '.[].databaseId' | while read -r id; do
-            if [ "$id" != "${{ github.run_id }}" ]; then
-              if gh api "repos/${{ github.repository }}/actions/runs/$id/artifacts" --jq '.artifacts[].name' | grep -Fxq "oracle-edge-lab-$id"; then
-                echo "$id"
-                break
-              fi
-            fi
-          done)
-          if [ -n "$PREVIOUS" ]; then
-            gh run download "$PREVIOUS" --repo "${{ github.repository }}" --name "oracle-edge-lab-$PREVIOUS" --dir edge-restore
-            if [ -s edge-restore/edge_forward_ledger.json ]; then
-              echo "Restored forward paper ledger from $PREVIOUS"
-            else
-              echo "Prior edge report predates forward ledger; starting ledger genesis"
-            fi
-          else
-            echo "No prior successful edge lab artifact; starting ledger genesis"
-          fi
+        run: python -m research.edge_evidence_restore --directory edge-restore
       - name: Append and settle delayed forward paper observations
         run: python -m research.edge_forward_paper --current edge_lab_report.json --prior edge-restore/edge_forward_ledger.json --output edge_forward_ledger.json
       - name: Audit forward ledger chronology and observed-price arithmetic
         run: python -m research.edge_forward_integrity_audit --ledger edge_forward_ledger.json --output edge_forward_integrity_audit.json
+      - name: Verify cross-run event prefix continuity
+        run: python -m research.edge_evidence_restore --prior edge-restore/edge_forward_ledger.json --current edge_forward_ledger.json --output edge_forward_continuity.json
       - name: Score paired delayed forward paper outcomes
         run: python -m research.edge_forward_scorecard --ledger edge_forward_ledger.json --report edge_lab_report.json --output edge_forward_scorecard.json
       - name: Summarize research without promoting historical backtests to proven edges
@@ -137,5 +123,7 @@ jobs:
             edge_forward_ledger.json
             edge_forward_scorecard.json
             edge_forward_integrity_audit.json
+            edge_forward_continuity.json
+            edge-restore/edge_restore_manifest.json
           if-no-files-found: warn
           retention-days: 30
