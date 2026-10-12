@@ -3,6 +3,8 @@ import argparse
 import hashlib
 import json
 import math
+from datetime import datetime, date, time, timezone
+from zoneinfo import ZoneInfo
 from pathlib import Path
 
 def digest(value):
@@ -26,15 +28,35 @@ def verify(state):
         raise ValueError("forward ledger head mismatch")
     return list(events)
 
+def parse_utc_timestamp(value):
+    if not isinstance(value,str):
+        raise ValueError("forward observation missing timestamp")
+    try:
+        stamp=datetime.fromisoformat(value.replace("Z","+00:00"))
+    except ValueError as exc:
+        raise ValueError("invalid forward observation timestamp") from exc
+    if stamp.tzinfo is None or stamp.utcoffset() is None:
+        raise ValueError("forward observation timestamp must include timezone")
+    return stamp.astimezone(timezone.utc)
+
+def session_open_utc(day):
+    """US ETF research proxy opening bell, not a complete exchange calendar."""
+    parsed=date.fromisoformat(day)
+    if parsed.weekday()>=5:
+        raise ValueError("weekend open is invalid")
+    return datetime.combine(parsed,time(9,30),tzinfo=ZoneInfo("America/New_York")).astimezone(timezone.utc)
+
 def advance(previous,current):
     if current.get("schema")!="oracle-q-edge-lab-v1" or current.get("orders_enabled") is not False or current.get("edge_proven") is not False:
         raise ValueError("untrusted research report")
+    observed_at=parse_utc_timestamp(current.get("observed_at"))
     reports=current.get("reports")
     if not isinstance(reports,list) or not reports:
         raise ValueError("no market reports")
     events=verify(previous)
     registered={}
     settled=set()
+    excluded=set()
     checkpoints={}
     for event in events:
         if event["type"]=="SOURCE_OPEN_CHECKPOINT":
@@ -52,9 +74,13 @@ def advance(previous,current):
                 raise ValueError("duplicate registered forward signal")
             registered[key]=event
         elif event["type"]=="PAPER_OUTCOME_OBSERVED":
-            if key in settled or key not in registered:
+            if key in settled or key in excluded or key not in registered:
                 raise ValueError("invalid paper settlement event")
             settled.add(key)
+        elif event["type"]=="SIGNAL_EXCLUDED_TIMING":
+            if key not in registered or key in excluded or key in settled:
+                raise ValueError("invalid excluded signal")
+            excluded.add(key)
         else:
             raise ValueError("unrecognized forward event")
     head=events[-1]["event_sha256"] if events else None
@@ -105,18 +131,35 @@ def advance(previous,current):
             key=(symbol,sid,report["last_completed_date"])
             if key not in registered:
                 event={"type":"SIGNAL_REGISTERED","symbol":symbol,"strategy_id":sid,
-                       "signal_date":key[2],"signal":wanted,"source_report_sha256":source_sha,
+                       "signal_date":key[2],"signal":wanted,
+                       "registered_at":observed_at.isoformat(),
+                       "source_report_sha256":source_sha,
                        "orders_enabled":False,"fill_verified":False}
                 add(event)
                 registered[key]=event
         for key,original in list(registered.items()):
-            if key[0]!=symbol or key in settled:
+            if key[0]!=symbol or key in settled or key in excluded:
                 continue
-            later=[(day,price) for day,price in opens.items() if day>key[2]]
-            if len(later)<2:
+            # Older signals lacked immutable creation time. Never backfill a
+            # potentially already elapsed market open as a forward fill.
+            if "registered_at" not in original:
+                add({"type":"SIGNAL_EXCLUDED_TIMING","symbol":symbol,
+                     "strategy_id":key[1],"signal_date":key[2],
+                     "reason":"LEGACY_SIGNAL_HAS_NO_REGISTRATION_TIMESTAMP",
+                     "orders_enabled":False,"fill_verified":False})
+                excluded.add(key)
                 continue
-            entry_date,entry_open=later[0]
-            exit_date,exit_open=later[1]
+            registered_at=parse_utc_timestamp(original["registered_at"])
+            # Entry must be strictly AFTER signal registration; do not assume
+            # a historical bar's open was tradeable when registration came later.
+            eligible=[(day,price) for day,price in opens.items()
+                      if day>key[2] and session_open_utc(day)>registered_at]
+            if len(eligible)<2:
+                continue
+            entry_date,entry_open=eligible[0]
+            exit_date,exit_open=eligible[1]
+            if session_open_utc(entry_date)<=registered_at:
+                raise ValueError("retroactive paper entry blocked")
             direction=original["signal"]
             result=direction*(exit_open/entry_open-1)
             if direction:
@@ -136,7 +179,8 @@ def advance(previous,current):
             "events":events,"events_recorded":len(events),"head_sha256":head,
             "signals_registered":len(registered),"outcomes_observed":len(settled),
             "open_checkpoints_recorded":len(checkpoints),
-            "pending_signals":len(registered)-len(settled),
+            "signals_excluded_timing":len(excluded),
+            "pending_signals":len(registered)-len(settled)-len(excluded),
             "warning":"Signals are archived before later prices are observed; hypothetical open-to-open returns are NOT fills or validated strategy profitability."}
 
 def main():
