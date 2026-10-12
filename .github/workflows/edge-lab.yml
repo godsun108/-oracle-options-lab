@@ -8,6 +8,8 @@ on:
       - 'research/edge_lab.py'
       - 'research/edge_forward_paper.py'
       - 'research/edge_forward_scorecard.py'
+      - 'research/edge_forward_integrity_audit.py'
+      - 'tests/test_edge_forward_integrity_audit.py'
       - 'research/edge_registry.json'
       - 'tests/test_edge_lab.py'
       - 'tests/test_edge_forward_paper.py'
@@ -18,6 +20,8 @@ on:
       - "research/edge_lab.py"
       - "research/edge_forward_paper.py"
       - "research/edge_forward_scorecard.py"
+      - "research/edge_forward_integrity_audit.py"
+      - "tests/test_edge_forward_integrity_audit.py"
       - "tests/test_edge_forward_scorecard.py"
       - "tests/test_edge_forward_paper.py"
       - "tests/test_edge_lab.py"
@@ -44,7 +48,7 @@ jobs:
         with:
           python-version: "3.11"
       - name: Verify pre-registered edge lab research
-        run: python -m unittest tests.test_edge_lab tests.test_edge_forward_paper tests.test_edge_forward_scorecard -v
+        run: python -m unittest tests.test_edge_lab tests.test_edge_forward_paper tests.test_edge_forward_scorecard tests.test_edge_forward_integrity_audit -v
 
   research:
     if: github.event_name != 'pull_request'
@@ -86,6 +90,8 @@ jobs:
           fi
       - name: Append and settle delayed forward paper observations
         run: python -m research.edge_forward_paper --current edge_lab_report.json --prior edge-restore/edge_forward_ledger.json --output edge_forward_ledger.json
+      - name: Audit forward ledger chronology and observed-price arithmetic
+        run: python -m research.edge_forward_integrity_audit --ledger edge_forward_ledger.json --output edge_forward_integrity_audit.json
       - name: Score paired delayed forward paper outcomes
         run: python -m research.edge_forward_scorecard --ledger edge_forward_ledger.json --report edge_lab_report.json --output edge_forward_scorecard.json
       - name: Summarize research without promoting historical backtests to proven edges
@@ -107,6 +113,10 @@ jobs:
                   f.write(f"Forward scorecard: {sc.get('outcomes_total',0)} settled observations across {len(sc.get('pairs',[]))} strategy-market pairs; excluded untimed signals: {sc.get('signals_excluded_timing',0)}.\\n")
                   for pair in sc.get("pairs",[]):
                       f.write(f"- {pair['symbol']} / {pair['strategy_id']}: {pair['outcomes_observed']} settled, {pair['pending']} pending, {pair.get('signals_excluded_timing',0)} excluded for missing timing; status: {pair['status']}\\n")
+              audit_path=Path("edge_forward_integrity_audit.json")
+              if audit_path.exists():
+                  integrity=json.loads(audit_path.read_text())
+                  f.write(f"Forward integrity audit: {integrity.get('status','MISSING')} | outcomes: {integrity.get('forward_outcomes',0)} | excluded: {integrity.get('excluded_legacy_signals',0)}\\n")
               ledger_path=Path("edge_forward_ledger.json")
               if ledger_path.exists():
                   paper=json.loads(ledger_path.read_text())
@@ -122,5 +132,6 @@ jobs:
             edge_lab_report.json
             edge_forward_ledger.json
             edge_forward_scorecard.json
+            edge_forward_integrity_audit.json
           if-no-files-found: warn
           retention-days: 30
