@@ -4,6 +4,7 @@ from research.edge_forward_paper import advance,verify
 
 def report(day,opens):
     return {"schema":"oracle-q-edge-lab-v1","orders_enabled":False,"edge_proven":False,
+            "observed_at":day+"T20:00:00+00:00",
             "reports":[{"symbol":"SPY","status":"HISTORICAL_OPEN_PROXY_BACKTEST_ONLY",
                         "price_field":"open_only","last_completed_date":day,
                         "recent_opens":[{"time":d,"open":p} for d,p in opens],
@@ -50,6 +51,34 @@ class ForwardPaperTests(unittest.TestCase):
         tampered["events"][0]["open_price"]=999.0
         with self.assertRaisesRegex(ValueError,"hash chain"):
             verify(tampered)
+    def test_after_open_registration_skips_same_day_entry(self):
+        a=report("2026-10-05",[("2026-10-05",100.0)])
+        a["observed_at"]="2026-10-06T16:00:00+00:00" # Tuesday after 09:30 NY
+        first=advance(None,a)
+        second=advance(first,report("2026-10-07",[
+            ("2026-10-05",100.0),("2026-10-06",101.0),("2026-10-07",102.0)]))
+        self.assertEqual(second["outcomes_observed"],0)
+        third=advance(second,report("2026-10-08",[
+            ("2026-10-05",100.0),("2026-10-06",101.0),
+            ("2026-10-07",102.0),("2026-10-08",103.0)]))
+        old=[x for x in third["events"] if x["type"]=="PAPER_OUTCOME_OBSERVED" and x["signal_date"]=="2026-10-05"]
+        self.assertEqual(len(old),2)
+        self.assertTrue(all(x["entry_date"]=="2026-10-07" for x in old))
+    def test_legacy_untimestamped_signals_excluded(self):
+        from research.edge_forward_paper import digest
+        first=advance(None,report("2026-10-05",[("2026-10-05",100.0)]))
+        prior=None
+        for event in first["events"]:
+            event.pop("registered_at",None)
+            event["previous_sha256"]=prior
+            event["event_sha256"]=digest({k:v for k,v in event.items() if k!="event_sha256"})
+            prior=event["event_sha256"]
+        first["head_sha256"]=prior
+        second=advance(first,report("2026-10-07",[
+            ("2026-10-05",100.0),("2026-10-06",101.0),("2026-10-07",102.0)]))
+        self.assertEqual(second["signals_excluded_timing"],2)
+        self.assertEqual(second["outcomes_observed"],0)
+        self.assertEqual(second["pending_signals"],2)
     def test_invalid_report_blocks_signals(self):
         bad=report("2026-10-05",[("2026-10-05",100.0)])
         bad["reports"][0]["status"]="DATA_OR_VALIDATION_FAILURE"
