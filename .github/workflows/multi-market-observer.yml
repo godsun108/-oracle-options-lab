@@ -25,6 +25,8 @@ on:
       - "tests/test_paco_signal_gated_audit.py"
       - "research/paco_quote_outcome_audit.py"
       - "tests/test_paco_quote_outcome_audit.py"
+      - "research/paco_evidence_readiness.py"
+      - "tests/test_paco_evidence_readiness.py"
       - "research/paco_premium_comparison.py"
       - "tests/test_paco_premium_comparison.py"
       - "research/paco_snapshot_continuity.py"
@@ -368,6 +370,14 @@ jobs:
             printf '{"schema":"paco-signal-gated-audit-v1","status":"SIGNAL_EVIDENCE_MISSING","orders_enabled":false,"strategy_profitability_proven":false,"eligible_contracts":0,"hypothetical_outcomes":[]}\n' > paco_signal_gated_audit.json
             echo 'PACO strategy signal evidence unavailable; no trades or strategy returns inferred'
           fi
+      - name: Summarize PACO evidence readiness
+        if: always()
+        run: |
+          if [ -s paco_snapshot_continuity.json ] && [ -s paco_premium_comparison.json ] && [ -s paco_spx_signal_evidence.json ]; then
+            python -m research.paco_evidence_readiness --continuity paco_snapshot_continuity.json --comparison paco_premium_comparison.json --signal paco_spx_signal_evidence.json --output paco_evidence_readiness.json
+          else
+            printf '{"schema":"paco-evidence-readiness-v1","status":"EVIDENCE_INCOMPLETE","orders_enabled":false,"strategy_profitability_proven":false,"trade_fills_verified":false}\n' > paco_evidence_readiness.json
+          fi
       - name: Show PACO options-feed status in Actions summary
         if: always()
         run: |
@@ -395,6 +405,7 @@ jobs:
             paco_premium_comparison.json
             paco_quote_outcome_audit.json
             paco_signal_gated_audit.json
+            paco_evidence_readiness.json
             paco_spx_signal_evidence.json
             paco_spx_history_diagnostic.json
             paco_spx_provenance_gap.json
