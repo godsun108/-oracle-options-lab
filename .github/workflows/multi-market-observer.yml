@@ -378,6 +378,29 @@ jobs:
           else
             printf '{"schema":"paco-evidence-readiness-v1","status":"EVIDENCE_INCOMPLETE","orders_enabled":false,"strategy_profitability_proven":false,"trade_fills_verified":false}\n' > paco_evidence_readiness.json
           fi
+      - name: Publish PACO evidence readiness in Actions summary
+        if: always()
+        run: |
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          p=Path("paco_evidence_readiness.json")
+          try:
+              d=json.loads(p.read_text()) if p.exists() else {}
+          except (ValueError,OSError):
+              d={}
+          if not isinstance(d,dict):
+              d={}
+          with open(os.environ["GITHUB_STEP_SUMMARY"],"a") as out:
+              out.write("\\n### PACO evidence readiness (read-only)\\n")
+              out.write(f"Status: {d.get('status','EVIDENCE_MISSING')}\\n")
+              out.write(f"Continuity runs: {d.get('continuity_runs','not verified')}\\n")
+              out.write(f"Hash chain verified: {d.get('continuity_hash_chain_verified') is True}\\n")
+              out.write(f"Matched option contracts: {d.get('matched_contracts','not verified')}\\n")
+              out.write(f"Cross-day quote pair observed: {d.get('cross_day_quote_pair_observed') is True}\\n")
+              out.write(f"SPX ATH signal verified: {d.get('spx_ath_signal_verified') is True}\\n")
+              out.write("Trade fills verified: NO | Profitability proven: NO | Live orders: DISABLED\\n")
+          PY
       - name: Show PACO options-feed status in Actions summary
         if: always()
         run: |
@@ -401,7 +424,6 @@ jobs:
             paco_option_chain_snapshots.json
             paco_snapshot_continuity.json
             paco_auth_diagnostic.json
-            paco_snapshot_continuity.json
             paco_premium_comparison.json
             paco_quote_outcome_audit.json
             paco_signal_gated_audit.json
