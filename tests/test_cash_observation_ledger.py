@@ -1,6 +1,10 @@
 import copy
+import json
+import tempfile
+from pathlib import Path
+from unittest.mock import patch
 import unittest
-from research.cash_observation_ledger import append
+from research.cash_observation_ledger import append, main
 
 def baseline(day="2026-10-08",source="a"*64):
     return {"schema":"oracle-q-cash-baseline-v1","status":"NO_TRADE_CASH_BASELINE",
@@ -23,6 +27,25 @@ class LedgerTests(unittest.TestCase):
         one=append(None,baseline())
         with self.assertRaises(ValueError):
             append(one,baseline(source="b"*64))
+    def test_cli_preserves_same_day_conflict_with_evidence(self):
+        with tempfile.TemporaryDirectory() as directory:
+            state=Path(directory)/"ledger.json"
+            incoming=Path(directory)/"baseline.json"
+            evidence=Path(directory)/"conflict.json"
+            original=append(None,baseline())
+            state.write_text(json.dumps(original))
+            incoming.write_text(json.dumps(baseline(source="b"*64)))
+            args=["ledger","--baseline",str(incoming),"--state",str(state),
+                  "--conflict-evidence",str(evidence)]
+            with patch("sys.argv",args):
+                main()
+            self.assertEqual(json.loads(state.read_text()),original)
+            report=json.loads(evidence.read_text())
+            self.assertEqual(report["status"],"SAME_DAY_CONFLICT_PRESERVED")
+            self.assertEqual(report["existing_source_sha256"],"a"*64)
+            self.assertEqual(report["incoming_source_sha256"],"b"*64)
+            self.assertFalse(report["orders_enabled"])
+
     def test_time_regression_rejected(self):
         one=append(None,baseline())
         with self.assertRaises(ValueError):

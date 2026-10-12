@@ -62,11 +62,32 @@ def main():
     p=argparse.ArgumentParser()
     p.add_argument("--baseline",required=True)
     p.add_argument("--state",required=True)
+    p.add_argument("--conflict-evidence")
     args=p.parse_args()
     path=Path(args.state)
     old=json.loads(path.read_text()) if path.exists() else None
     baseline=json.loads(Path(args.baseline).read_text())
-    new=append(old,baseline)
+    try:
+        new=append(old,baseline)
+    except ValueError as exc:
+        if str(exc)!="conflicting observation for same day" or not args.conflict_evidence:
+            raise
+        # Keep the verified chain untouched; record the competing observation separately.
+        evidence={
+            "schema":"oracle-q-cash-observation-conflict-v1",
+            "status":"SAME_DAY_CONFLICT_PRESERVED",
+            "as_of":baseline["as_of"],
+            "existing_source_sha256":old["entries"][-1]["source_sha256"],
+            "incoming_source_sha256":baseline["source_sha256"],
+            "ledger_head_hash":old["entries"][-1]["entry_hash"],
+            "orders_enabled":False,
+            "strategy_profitability_proven":False,
+        }
+        target=Path(args.conflict_evidence)
+        target.parent.mkdir(parents=True,exist_ok=True)
+        target.write_text(json.dumps(evidence,sort_keys=True,indent=2)+"\\n")
+        print("Cash checkpoint same-day conflict preserved; existing chain unchanged")
+        return
     path.parent.mkdir(parents=True,exist_ok=True)
     tmp=path.with_suffix(".tmp")
     tmp.write_text(json.dumps(new,sort_keys=True,indent=2)+"\n")
