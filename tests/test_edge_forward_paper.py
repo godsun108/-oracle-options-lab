@@ -35,6 +35,21 @@ class ForwardPaperTests(unittest.TestCase):
         changed["events"][0]["signal"]=0
         with self.assertRaisesRegex(ValueError,"hash chain"):
             advance(changed,report("2026-10-06",[("2026-10-06",101.0)]))
+    def test_price_revision_fails_closed_before_new_settlement(self):
+        a=advance(None,report("2026-10-05",[("2026-10-05",100.0)]))
+        self.assertEqual(a["open_checkpoints_recorded"],1)
+        with self.assertRaisesRegex(ValueError,"SOURCE_OPEN_REVISED"):
+            advance(a,report("2026-10-06",[("2026-10-05",100.01),("2026-10-06",101.0)]))
+        self.assertEqual(len(verify(a)),a["events_recorded"])
+    def test_checkpoints_idempotent_and_hashed(self):
+        a=advance(None,report("2026-10-05",[("2026-10-05",100.0)]))
+        b=advance(a,report("2026-10-05",[("2026-10-05",100.0)]))
+        self.assertEqual(b["open_checkpoints_recorded"],1)
+        self.assertEqual(b["events_recorded"],a["events_recorded"])
+        tampered=copy.deepcopy(b)
+        tampered["events"][0]["open_price"]=999.0
+        with self.assertRaisesRegex(ValueError,"hash chain"):
+            verify(tampered)
     def test_invalid_report_blocks_signals(self):
         bad=report("2026-10-05",[("2026-10-05",100.0)])
         bad["reports"][0]["status"]="DATA_OR_VALIDATION_FAILURE"

@@ -35,7 +35,17 @@ def advance(previous,current):
     events=verify(previous)
     registered={}
     settled=set()
+    checkpoints={}
     for event in events:
+        if event["type"]=="SOURCE_OPEN_CHECKPOINT":
+            key=(event["symbol"],event["open_date"])
+            if key in checkpoints:
+                raise ValueError("duplicate open checkpoint")
+            price=event.get("open_price")
+            if not isinstance(price,(int,float)) or isinstance(price,bool) or not math.isfinite(price) or price<=0:
+                raise ValueError("invalid historical open checkpoint")
+            checkpoints[key]=price
+            continue
         key=(event["symbol"],event["strategy_id"],event["signal_date"])
         if event["type"]=="SIGNAL_REGISTERED":
             if key in registered:
@@ -71,6 +81,22 @@ def advance(previous,current):
             opens[day]=price
         if list(opens)!=sorted(opens) or report["last_completed_date"]!=dates[-1]["time"]:
             raise ValueError("recent open chronology mismatch")
+        # Check every previously observed opening price before recording new evidence.
+        # A vendor adjustment or correction must be investigated explicitly, not
+        # silently allowed to rewrite forward paper outcome assumptions.
+        for day,price in opens.items():
+            key=(symbol,day)
+            if key in checkpoints and checkpoints[key]!=price:
+                raise ValueError("SOURCE_OPEN_REVISED: "+symbol+" "+day)
+        for day,price in opens.items():
+            key=(symbol,day)
+            if key not in checkpoints:
+                add({"type":"SOURCE_OPEN_CHECKPOINT","symbol":symbol,
+                     "open_date":day,"open_price":price,
+                     "source_report_sha256":source_sha,
+                     "checkpoint_class":"SOURCE_PRICE_OBSERVATION_NOT_FORWARD_SIGNAL",
+                     "orders_enabled":False,"fill_verified":False})
+                checkpoints[key]=price
         for strategy in report["strategies"]:
             sid=strategy["strategy_id"]
             wanted=strategy["next_session_paper_signal"]
@@ -109,6 +135,7 @@ def advance(previous,current):
             "orders_enabled":False,"fill_verified":False,"edge_proven":False,
             "events":events,"events_recorded":len(events),"head_sha256":head,
             "signals_registered":len(registered),"outcomes_observed":len(settled),
+            "open_checkpoints_recorded":len(checkpoints),
             "pending_signals":len(registered)-len(settled),
             "warning":"Signals are archived before later prices are observed; hypothetical open-to-open returns are NOT fills or validated strategy profitability."}
 
