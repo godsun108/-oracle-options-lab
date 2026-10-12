@@ -80,6 +80,7 @@ def evaluate(symbol, raw, registry, *, now=None):
     if symbol not in SYMBOLS or symbol not in registry["proxy_symbols"]:
         raise ValueError("unregistered market proxy")
     bars = validate_open_bars(raw, now=now)
+    source_ohlc_diagnostic=diagnose_raw_bars(raw,now=now)
     if len(bars) < 320:
         return {"symbol":symbol,"status":"INSUFFICIENT_COMPLETED_BARS",
                 "bars":len(bars),"orders_enabled":False,"edge_proven":False}
@@ -102,6 +103,7 @@ def evaluate(symbol, raw, registry, *, now=None):
             "bars":len(bars),"first_date":bars[0]["time"],"last_completed_date":bars[-1]["time"],
             "train_start":bars[first]["time"],"holdout_start":bars[split]["time"],
             "holdout_end":bars[stop]["time"],"open_series_sha256":payload_hash,"price_field":"open_only",
+            "source_ohlc_diagnostic":source_ohlc_diagnostic,
             "close_ohlc_validation":"NOT_USED_IN_OPEN_ONLY_MODEL",
             "strategies":rows,"orders_enabled":False,"forward_paper_verified":False,
             "edge_proven":False,"warnings":["Open-only signals lag completed opening prices and do not replicate close-based published strategies.",
