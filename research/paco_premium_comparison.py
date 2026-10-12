@@ -1,11 +1,29 @@
 """Conservative PACO option premium comparison between two collected snapshots."""
 import argparse
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 def compare(earlier,later):
     if any(x.get("status")!="COLLECTED" or x.get("orders_enabled") is not False for x in (earlier,later)):
         raise ValueError("both collections must be read-only and COLLECTED")
+    def timestamp(collection):
+        raw=collection.get("collected_at")
+        if not isinstance(raw,str):
+            raise ValueError("missing collection timestamp")
+        try:
+            parsed=datetime.fromisoformat(raw.replace("Z","+00:00"))
+        except ValueError as exc:
+            raise ValueError("invalid collection timestamp") from exc
+        if parsed.tzinfo is None:
+            raise ValueError("collection timestamp must include timezone")
+        return parsed.astimezone(timezone.utc)
+    start=timestamp(earlier)
+    end=timestamp(later)
+    if end<=start:
+        raise ValueError("later collection must be strictly after earlier collection")
+    elapsed_seconds=round((end-start).total_seconds(),3)
+    same_utc_day=start.date()==end.date()
     def index(collection):
         found={}
         for snap in collection.get("snapshots",[]):
@@ -29,9 +47,10 @@ def compare(earlier,later):
                      "midpoint_change":round((b["bid"]+b["ask"]-a["bid"]-a["ask"])/2,4),
                      "hypothetical_buy_ask_sell_bid_change":round(b["bid"]-a["ask"],4),
                      "executable_fill_verified":False,"quote_freshness_verified":False})
-    return {"schema":"paco-premium-comparison-v1","status":"COMPARABLE" if rows else "NO_MATCHING_CONTRACTS",
+    return {"schema":"paco-premium-comparison-v1","status":("SAME_DAY_OBSERVATIONAL_ONLY" if rows and same_utc_day else "COMPARABLE" if rows else "NO_MATCHING_CONTRACTS"),
             "earlier_collection":earlier.get("collected_at"),"later_collection":later.get("collected_at"),
             "matched_contracts":len(rows),"contracts":rows,"orders_enabled":False,
+            "elapsed_seconds":elapsed_seconds,"same_utc_day":same_utc_day,"multi_day_outcome_verified":False,
             "warning":"Observational quotes only: timestamps do not verify quote freshness, execution, or returns."}
 
 def main():

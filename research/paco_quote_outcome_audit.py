@@ -7,7 +7,7 @@ from pathlib import Path
 def evaluate(comparison, *, fee_per_side=0.65, multiplier=100):
     if comparison.get("schema")!="paco-premium-comparison-v1" or comparison.get("orders_enabled") is not False:
         raise ValueError("invalid read-only PACO comparison")
-    if comparison.get("status") not in ("COMPARABLE","NO_MATCHING_CONTRACTS"):
+    if comparison.get("status") not in ("COMPARABLE","SAME_DAY_OBSERVATIONAL_ONLY","NO_MATCHING_CONTRACTS"):
         raise ValueError("invalid comparison status")
     if not isinstance(fee_per_side,(int,float)) or not math.isfinite(fee_per_side) or fee_per_side<0:
         raise ValueError("invalid fee")
@@ -29,6 +29,7 @@ def evaluate(comparison, *, fee_per_side=0.65, multiplier=100):
     wins=sum(x["hypothetical_net_usd"]>0 for x in rows)
     return {"schema":"paco-quote-outcome-audit-v1","status":"OBSERVATIONAL_ONLY" if rows else "INSUFFICIENT_DATA",
             "matched_contracts":comparison.get("matched_contracts"),
+            "same_utc_day":comparison.get("same_utc_day"),"multi_day_outcome_verified":False,
             "audited_contracts":len(rows),"skipped_contracts":skipped,
             "positive_quote_outcomes":wins,"nonpositive_quote_outcomes":len(rows)-wins,
             "fee_per_side_usd":fee_per_side,"multiplier":multiplier,
