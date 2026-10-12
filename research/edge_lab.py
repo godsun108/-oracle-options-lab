@@ -114,7 +114,7 @@ def main():
     a=p.parse_args()
     registry=json.loads(Path(a.registry).read_text())
     report=run(registry,os.getenv("TRADIER_TOKEN",""))
-    Path(a.output).write_text(json.dumps(report,indent=2,sort_keys=True)+"\\n")
+    Path(a.output).write_text(json.dumps(report,indent=2,sort_keys=True)+"\n")
     print("Edge lab:",[(r["symbol"],r["status"]) for r in report["reports"]])
     if any(r["status"]!="HISTORICAL_PROXY_BACKTEST_ONLY" for r in report["reports"]):
         raise SystemExit(1)
