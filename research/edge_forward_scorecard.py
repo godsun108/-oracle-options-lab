@@ -11,6 +11,7 @@ from collections import defaultdict
 from pathlib import Path
 
 from research.edge_forward_paper import verify
+from research.edge_forward_uncertainty import assess
 
 MIN_OUTCOMES_FOR_REVIEW = 60
 
@@ -82,6 +83,7 @@ def score(ledger, *, expected_pairs=None):
             "positive_observation_rate":round(sum(v>0 for v in returns)/n,6) if n else None,
             "mean_buy_hold_pct":_mean(benchmark) if paired==n else None,
             "mean_excess_vs_buy_hold_pct":_mean(excess) if paired==n else None,
+            "exploratory_uncertainty":assess(excess if paired==n else [],family_size=len(expected),minimum=MIN_OUTCOMES_FOR_REVIEW),
             "status":("INSUFFICIENT_FORWARD_SAMPLE" if n<MIN_OUTCOMES_FOR_REVIEW
                       else "REVIEW_REQUIRED_NOT_PROVEN"),
             "edge_proven":False, "eligible_for_live_trading":False,
@@ -97,7 +99,7 @@ def score(ledger, *, expected_pairs=None):
         "limitations":[
             "Descriptive hypothetical open-to-open observations are not executable fills.",
             "60 observations permits manual review only; it does not establish statistical significance.",
-            "Overlapping markets, correlated strategies, regime changes and multiple testing remain unadjusted.",
+            "An exploratory Bonferroni-adjusted block bootstrap is computed only after 60 paired outcomes; it does not eliminate correlated strategies, regime changes or repeated testing.",
             "No forward alpha, robust slippage, drawdown distribution, or live profitability is proven."
         ]
     }
