@@ -6,7 +6,7 @@ import math
 import os
 from pathlib import Path
 from research.multi_market_observer import SYMBOLS, eligible_cutoff, request_history
-from research.tradier_daily_bars import validate_daily_bars
+from datetime import date
 
 WARMUP = 200
 COST_PER_SIDE = 0.001  # conservative 10 basis points on each position transition
@@ -25,7 +25,7 @@ def signal(strategy, closes):
     raise ValueError("unregistered strategy")
 
 def segment(bars, strategy, start, stop, *, benchmark=False):
-    """Signal from close[i-1], hypothetical entry at open[i], exit/rebalance open[i+1]."""
+    """Signal from open[i-1] or earlier; hypothetical entry at open[i]."""
     cash = INITIAL_CASH
     peak = cash
     worst = 0.0
@@ -33,7 +33,7 @@ def segment(bars, strategy, start, stop, *, benchmark=False):
     transitions = 0
     invested_days = 0
     for i in range(start, stop):
-        wanted = 1 if benchmark else signal(strategy, [b["close"] for b in bars[:i]])
+        wanted = 1 if benchmark else signal(strategy, [b["open"] for b in bars[:i]])
         # Charge on the open where a position is changed, not on the signal bar.
         if wanted != position:
             cash *= (1 - COST_PER_SIDE)
@@ -53,10 +53,33 @@ def segment(bars, strategy, start, stop, *, benchmark=False):
             "invested_days":invested_days,"capital_reference_usd":INITIAL_CASH,
             "fill_verified":False,"cost_per_position_transition_bps":10}
 
+def validate_open_bars(rows, *, now=None):
+    """Validate only opens used by the model; never repair adjusted-close anomalies."""
+    if not isinstance(rows,list):
+        raise ValueError("opening-price observations must be a list")
+    cutoff=eligible_cutoff(now)
+    found={}
+    for row in rows:
+        if not isinstance(row,dict):
+            raise ValueError("invalid open observation")
+        try:
+            day=date.fromisoformat(str(row["date"])[:10])
+            if day>cutoff:
+                continue
+            if day.weekday()>=5 or day.isoformat() in found:
+                raise ValueError("weekend or duplicate open observation")
+            price=float(row["open"])
+            if not math.isfinite(price) or price<=0:
+                raise ValueError("invalid opening price")
+            found[day.isoformat()]=price
+        except (KeyError,TypeError,ValueError,OverflowError) as exc:
+            raise ValueError("invalid open observation") from exc
+    return [{"time":day,"open":price} for day,price in sorted(found.items())]
+
 def evaluate(symbol, raw, registry, *, now=None):
     if symbol not in SYMBOLS or symbol not in registry["proxy_symbols"]:
         raise ValueError("unregistered market proxy")
-    bars = validate_daily_bars(raw, now=now)
+    bars = validate_open_bars(raw, now=now)
     if len(bars) < 320:
         return {"symbol":symbol,"status":"INSUFFICIENT_COMPLETED_BARS",
                 "bars":len(bars),"orders_enabled":False,"edge_proven":False}
@@ -73,14 +96,16 @@ def evaluate(symbol, raw, registry, *, now=None):
                      "train":segment(bars,strategy,first,split),
                      "holdout":segment(bars,strategy,split,stop),
                      "holdout_buy_hold":segment(bars,strategy,split,stop,benchmark=True),
-                     "next_session_paper_signal":signal(strategy,[b["close"] for b in bars]),
+                     "next_session_paper_signal":signal(strategy,[b["open"] for b in bars]),
                      "next_session_fill_verified":False,"edge_proven":False})
-    return {"symbol":symbol,"status":"HISTORICAL_PROXY_BACKTEST_ONLY",
+    return {"symbol":symbol,"status":"HISTORICAL_OPEN_PROXY_BACKTEST_ONLY",
             "bars":len(bars),"first_date":bars[0]["time"],"last_completed_date":bars[-1]["time"],
             "train_start":bars[first]["time"],"holdout_start":bars[split]["time"],
-            "holdout_end":bars[stop]["time"],"ohlc_sha256":payload_hash,
+            "holdout_end":bars[stop]["time"],"open_series_sha256":payload_hash,"price_field":"open_only",
+            "close_ohlc_validation":"NOT_USED_IN_OPEN_ONLY_MODEL",
             "strategies":rows,"orders_enabled":False,"forward_paper_verified":False,
-            "edge_proven":False,"warnings":["ETF proxies are not exact replications of cited academic strategies.",
+            "edge_proven":False,"warnings":["Open-only signals lag completed opening prices and do not replicate close-based published strategies.",
+              "ETF proxies are not exact replications of cited academic strategies.",
               "Chronological holdout is historical, not independently forward paper-traded.",
               "Corporate actions, financing, borrow, taxes, and data adjustments are not independently verified.",
               "No actual fills, live orders, or statistical edge established."]}
@@ -138,6 +163,7 @@ def run(registry, token, *, fetch=request_history, now=None):
             "cutoff":cutoff.isoformat(),"provider":"tradier","orders_enabled":False,
             "forward_paper_verified":False,"edge_proven":False,
             "cost_model":"10 bps per entry or exit, open-to-next-open, unlevered long/cash",
+            "signal_source":"prior completed opens only; no closes used",
             "reports":reports}
 
 def main():
