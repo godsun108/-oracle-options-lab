@@ -1,8 +1,10 @@
 import json
 import unittest
+import urllib.error
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from research.edge_lab import signal, segment, evaluate, run, diagnose_raw_bars, validate_open_bars
+from research.edge_lab import fetch_with_transport_retries
 
 from research.edge_session_calendar import is_session
 
@@ -21,6 +23,42 @@ def bars(n=420):
             for i,day in enumerate(reversed(sessions))]
 
 class EdgeLabTests(unittest.TestCase):
+    def test_transport_retries_are_bounded_and_recorded(self):
+        trace=[]; delays=[]; calls=[]
+        def fetch():
+            calls.append(1)
+            if len(calls)<3:raise TimeoutError("SECRET must never appear")
+            return [{"open":100}]
+        self.assertEqual(fetch_with_transport_retries(fetch,(),trace,sleep=delays.append),[{"open":100}])
+        self.assertEqual(delays,[1,2]);self.assertEqual(len(trace),3)
+        self.assertNotIn("SECRET",str(trace))
+        self.assertEqual(trace[-1]["status"],"RESPONSE_RECEIVED")
+        trace=[]
+        def fail():raise TimeoutError("never ready")
+        with self.assertRaises(TimeoutError):fetch_with_transport_retries(fail,(),trace,sleep=lambda _:None)
+        self.assertEqual(len(trace),3);self.assertFalse(trace[-1]["retry_scheduled"])
+
+    def test_auth_rate_limits_and_invalid_responses_are_not_retried(self):
+        for exc in [urllib.error.HTTPError("hidden",code,"hidden",{},None) for code in (401,403,429,404)]+[ValueError("invalid JSON")]:
+            trace=[]
+            def fail():raise exc
+            with self.subTest(exc=type(exc).__name__),self.assertRaises(type(exc)):
+                fetch_with_transport_retries(fail,(),trace,sleep=lambda _:self.fail("unexpected retry"))
+            self.assertEqual(len(trace),1)
+        trace=[]
+        rows=[{"open":"NaN"}]
+        self.assertIs(fetch_with_transport_retries(lambda:rows,(),trace),rows)
+        self.assertEqual(len(trace),1)
+
+    def test_only_allowlisted_gateway_statuses_retry(self):
+        for code in (502,503,504):
+            trace=[]
+            def fail():raise urllib.error.HTTPError("hidden",code,"hidden",{},None)
+            with self.assertRaises(urllib.error.HTTPError):
+                fetch_with_transport_retries(fail,(),trace,sleep=lambda _:None)
+            self.assertEqual(len(trace),3)
+            self.assertTrue(all(x["http_status"]==code for x in trace))
+
     def test_signals_use_prior_completed_closes(self):
         c=[100+i for i in range(220)]
         self.assertEqual(signal("tsmom_63",c),1)
