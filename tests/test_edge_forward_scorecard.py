@@ -6,7 +6,9 @@ from tests.test_edge_forward_paper import report
 
 class ForwardScorecardTests(unittest.TestCase):
     def test_maturity_uses_holiday_and_early_close_calendar(self):
-        ledger=advance(None,report("2026-11-24",[("2026-11-24",100.0)]))
+        source=report("2026-11-24",[("2026-11-24",100.0)])
+        source["observed_at"]="2026-11-24T22:00:00Z"
+        ledger=advance(None,source)
         pending=score(ledger,as_of="2026-11-27T18:14:59Z")["maturity"]["pending"]
         self.assertEqual(pending[0]["exit_session"],"2026-11-27")
         self.assertEqual(pending[0]["earliest_data_eligibility_utc"],"2026-11-27T18:15:00+00:00")
