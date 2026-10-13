@@ -9,8 +9,10 @@ import math
 import statistics
 from collections import defaultdict
 from pathlib import Path
+from datetime import datetime, timezone
 
-from research.edge_forward_paper import verify
+from research.edge_forward_paper import verify, parse_utc_timestamp
+from research.edge_session_calendar import expected_entry_exit, session_bounds, PUBLICATION_BUFFER
 from research.edge_forward_uncertainty import assess
 
 MIN_OUTCOMES_FOR_REVIEW = 60
@@ -18,7 +20,41 @@ MIN_OUTCOMES_FOR_REVIEW = 60
 def _mean(values):
     return round(statistics.fmean(values), 6) if values else None
 
-def score(ledger, *, expected_pairs=None):
+def pending_schedule(events, as_of):
+    """Describe maturity, never infer prices, fills, or completed outcomes."""
+    stamp = parse_utc_timestamp(as_of)
+    closed = {(e["symbol"], e["strategy_id"], e["signal_date"]) for e in events
+              if e["type"] in ("PAPER_OUTCOME_OBSERVED", "SIGNAL_EXCLUDED_TIMING")}
+    rows = []
+    for event in events:
+        if event["type"] != "SIGNAL_REGISTERED":
+            continue
+        key = (event["symbol"], event["strategy_id"], event["signal_date"])
+        if key in closed:
+            continue
+        if "registered_at" not in event:
+            rows.append(dict(zip(("symbol", "strategy_id", "signal_date"), key),
+                             status="UNVERIFIABLE_REGISTRATION_TIME"))
+            continue
+        registered = parse_utc_timestamp(event["registered_at"])
+        if registered > stamp:
+            raise ValueError("schedule snapshot precedes registration")
+        entry, exit_day = expected_entry_exit(event["signal_date"], registered)
+        entry_at = session_bounds(entry)[0]
+        exit_at, close_at = session_bounds(exit_day)
+        eligible = close_at + PUBLICATION_BUFFER
+        status = ("WAITING_FOR_ENTRY_SESSION" if stamp < entry_at else
+                  "WAITING_FOR_EXIT_SESSION" if stamp < exit_at else
+                  "WAITING_FOR_DAILY_BAR_ELIGIBILITY" if stamp < eligible else
+                  "ELIGIBLE_AWAITING_VALIDATED_DATA_OR_SETTLEMENT")
+        rows.append({"symbol":key[0], "strategy_id":key[1], "signal_date":key[2],
+                     "entry_session":entry, "exit_session":exit_day,
+                     "earliest_data_eligibility_utc":eligible.isoformat(), "status":status})
+    return {"as_of":stamp.isoformat(), "pending":rows,
+            "warning":"Eligibility is calendar policy, not guaranteed publication or workflow execution; no outcome is inferred."}
+
+
+def score(ledger, *, expected_pairs=None, as_of=None):
     events = verify(ledger)
     groups = defaultdict(list)
     signals = defaultdict(int)
@@ -88,7 +124,7 @@ def score(ledger, *, expected_pairs=None):
                       else "REVIEW_REQUIRED_NOT_PROVEN"),
             "edge_proven":False, "eligible_for_live_trading":False,
         })
-    return {
+    result = {
         "schema":"oracle-q-edge-forward-scorecard-v1",
         "status":"FORWARD_PAPER_RESEARCH_ONLY",
         "minimum_outcomes_for_review":MIN_OUTCOMES_FOR_REVIEW,
@@ -103,6 +139,9 @@ def score(ledger, *, expected_pairs=None):
             "No forward alpha, robust slippage, drawdown distribution, or live profitability is proven."
         ]
     }
+    if as_of is not None:
+        result["maturity"] = pending_schedule(events, as_of)
+    return result
 
 def main():
     parser=argparse.ArgumentParser()
@@ -119,9 +158,13 @@ def main():
         if market.get("status")!="HISTORICAL_OPEN_PROXY_BACKTEST_ONLY":
             raise ValueError("invalid market research source")
         expected.extend((market["symbol"],s["strategy_id"]) for s in market["strategies"])
-    result=score(ledger,expected_pairs=expected)
+    result=score(ledger,expected_pairs=expected,as_of=datetime.now(timezone.utc).isoformat())
     Path(args.output).write_text(json.dumps(result,indent=2,sort_keys=True)+"\n")
     print("Forward scorecard:",len(result["pairs"]),"pairs,",result["outcomes_total"],"outcomes, no proven edge")
+    states=defaultdict(int)
+    for item in result["maturity"]["pending"]:
+        states[item["status"]]+=1
+    print("Forward maturity:",json.dumps(dict(states),sort_keys=True))
 
 if __name__=="__main__":
     main()
