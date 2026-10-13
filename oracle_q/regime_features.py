@@ -1,6 +1,7 @@
 """Regime feature scaffold for Oracle AI / Oracle Q.
 
-Features are computed using information available at or before the signal close.
+Features use rows through each supplied date, including that date's close.
+This calculation alone does not establish publication or receipt timing.
 This module deliberately does not optimize thresholds or inspect future returns.
 """
 from __future__ import annotations
