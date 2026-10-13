@@ -1,0 +1,72 @@
+"""Reproduce report signals from retained parsed provider rows before ledger writes."""
+import argparse
+import json
+from datetime import timedelta
+from pathlib import Path
+from research.edge_forward_paper import digest, parse_utc_timestamp
+from research.edge_lab import evaluate
+from research.edge_session_calendar import eligible_cutoff, CALENDAR_SHA256
+
+
+def audit(report, registry):
+    if report.get("schema") != "oracle-q-edge-lab-v1" or report.get("orders_enabled") is not False or report.get("edge_proven") is not False:
+        raise ValueError("invalid research report")
+    cutoff_at = parse_utc_timestamp(report.get("evaluation_cutoff_at"))
+    observed = parse_utc_timestamp(report.get("observed_at"))
+    cutoff = eligible_cutoff(cutoff_at)
+    if report.get("cutoff") != cutoff.isoformat() or report.get("calendar_sha256") != CALENDAR_SHA256:
+        raise ValueError("source calendar mismatch")
+    if cutoff_at > observed:
+        raise ValueError("source clock reversed")
+    markets = report.get("reports", [])
+    if sorted(r["symbol"] for r in markets) != sorted(registry["proxy_symbols"]):
+        raise ValueError("source markets missing or duplicated")
+    checked = []
+    for market in markets:
+        evidence = market.get("source_evidence", {})
+        if (evidence.get("schema") != "oracle-q-parsed-history-evidence-v1"
+                or evidence.get("provider") != "tradier"
+                or evidence.get("symbol") != market["symbol"]):
+            raise ValueError("missing or mismatched source evidence")
+        started = parse_utc_timestamp(evidence.get("request_started_at"))
+        received = parse_utc_timestamp(evidence.get("received_at"))
+        if not cutoff_at <= started <= received <= observed:
+            raise ValueError("source receipt chronology invalid")
+        if market.get("source_received_at") != evidence["received_at"]:
+            raise ValueError("source receipt mismatch")
+        if (evidence.get("publication_at") is not None
+                or evidence.get("publication_time_verified") is not False):
+            raise ValueError("unsupported publication-time assertion")
+        if (evidence.get("request_end_date") != cutoff.isoformat()
+                or evidence.get("request_start_date") != (cutoff-timedelta(days=850)).isoformat()):
+            raise ValueError("source request range mismatch")
+        rows = evidence.get("rows")
+        if digest(rows) != market.get("source_payload_sha256"):
+            raise ValueError("source payload hash mismatch")
+        reproduced = evaluate(market["symbol"], rows, registry, now=cutoff_at)
+        if reproduced["status"] != "HISTORICAL_OPEN_PROXY_BACKTEST_ONLY":
+            raise ValueError("source insufficient for forward research")
+        if any(market.get(key) != value for key, value in reproduced.items()):
+            raise ValueError("source replay mismatch")
+        checked.append({"symbol":market["symbol"], "source_payload_sha256":digest(rows),
+                        "strategies_replayed":len(reproduced["strategies"])})
+    return {"schema":"oracle-q-source-replay-v1", "status":"SOURCE_REPLAY_MATCHED",
+            "report_sha256":digest(report), "markets":checked,
+            "publication_time_verified":False,"provider_authenticity_verified":False,
+            "eligible_for_live_trading":False,
+            "limitations":"Checks retained parsed rows and declared receipt clocks; not a provider signature, publication attestation, or fill."}
+
+
+def main():
+    parser=argparse.ArgumentParser()
+    parser.add_argument("--report",required=True)
+    parser.add_argument("--registry",default="research/edge_registry.json")
+    parser.add_argument("--output",default="edge_source_replay.json")
+    args=parser.parse_args()
+    result=audit(json.loads(Path(args.report).read_text()),json.loads(Path(args.registry).read_text()))
+    Path(args.output).write_text(json.dumps(result,indent=2,sort_keys=True)+"\n")
+    print("Source replay:",result["status"],len(result["markets"]),"markets")
+
+
+if __name__ == "__main__":
+    main()

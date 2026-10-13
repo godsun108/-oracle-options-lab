@@ -12,6 +12,8 @@ on:
       - 'tests/test_edge_session_calendar.py'
       - 'research/edge_execution_sensitivity.py'
       - 'tests/test_edge_execution_sensitivity.py'
+      - 'research/edge_source_replay.py'
+      - 'tests/test_edge_source_replay.py'
       - 'research/edge_lab.py'
       - 'research/edge_forward_paper.py'
       - 'research/edge_forward_scorecard.py'
@@ -33,6 +35,8 @@ on:
       - "tests/test_edge_session_calendar.py"
       - "research/edge_execution_sensitivity.py"
       - "tests/test_edge_execution_sensitivity.py"
+      - "research/edge_source_replay.py"
+      - "tests/test_edge_source_replay.py"
       - "research/edge_lab.py"
       - "research/edge_forward_paper.py"
       - "research/edge_forward_scorecard.py"
@@ -66,7 +70,7 @@ jobs:
         with:
           python-version: "3.11"
       - name: Verify pre-registered edge lab research
-        run: python -m unittest tests.test_edge_lab tests.test_edge_forward_paper tests.test_edge_forward_scorecard tests.test_edge_forward_integrity_audit tests.test_edge_forward_uncertainty tests.test_edge_evidence_restore tests.test_edge_session_calendar tests.test_edge_execution_sensitivity -v
+        run: python -m unittest tests.test_edge_source_replay tests.test_edge_lab tests.test_edge_forward_paper tests.test_edge_forward_scorecard tests.test_edge_forward_integrity_audit tests.test_edge_forward_uncertainty tests.test_edge_evidence_restore tests.test_edge_session_calendar tests.test_edge_execution_sensitivity -v
 
   research:
     if: github.event_name != 'pull_request'
@@ -82,6 +86,8 @@ jobs:
         env:
           TRADIER_TOKEN: ${{ secrets.TRADIER_TOKEN }}
         run: python -m research.edge_lab --registry research/edge_registry.json --output edge_lab_report.json
+      - name: Replay signals from retained source evidence before ledger writes
+        run: python -m research.edge_source_replay --report edge_lab_report.json --output edge_source_replay.json
       - name: Restore previous hash-linked forward paper observations
         env:
           GH_TOKEN: ${{ github.token }}
@@ -132,6 +138,7 @@ jobs:
           name: oracle-edge-lab-${{ github.run_id }}
           path: |
             edge_lab_report.json
+            edge_source_replay.json
             edge_forward_ledger.json
             edge_forward_scorecard.json
             edge_forward_integrity_audit.json
