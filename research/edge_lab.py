@@ -160,11 +160,20 @@ def run(registry, token, *, fetch=request_history, now=None):
     for symbol in registry["proxy_symbols"]:
         raw=None
         try:
+            request_started_at=datetime.now(timezone.utc).isoformat()
             raw=fetch(symbol,token,start,cutoff.isoformat())
             received_at=datetime.now(timezone.utc).isoformat()
             evaluated=evaluate(symbol,raw,registry,now=now)
             evaluated["source_received_at"]=received_at
             evaluated["source_payload_sha256"]=hashlib.sha256(json.dumps(raw,sort_keys=True,separators=(",",":"),allow_nan=False).encode()).hexdigest()
+            evaluated["source_evidence"]={
+                "schema":"oracle-q-parsed-history-evidence-v1",
+                "symbol":symbol,"provider":"tradier",
+                "request_start_date":start,"request_end_date":cutoff.isoformat(),
+                "request_started_at":request_started_at,"received_at":received_at,
+                "publication_at":None,"publication_time_verified":False,
+                "representation":"parsed history rows, not raw HTTP bytes",
+                "rows":raw}
             reports.append(evaluated)
         except (ValueError,KeyError,TypeError,TimeoutError,OSError) as exc:
             detail=diagnose_raw_bars(raw,now=now) if raw is not None else {"reason":"FETCH_UNAVAILABLE"}
@@ -173,6 +182,7 @@ def run(registry, token, *, fetch=request_history, now=None):
                             "orders_enabled":False,"edge_proven":False})
     return {"schema":"oracle-q-edge-lab-v1","status":"HISTORICAL_RESEARCH_ONLY",
             "observed_at":datetime.now(timezone.utc).isoformat(),
+            "evaluation_cutoff_at":now.isoformat(),
             "calendar_sha256":CALENDAR_SHA256,
             "cutoff":cutoff.isoformat(),"provider":"tradier","orders_enabled":False,
             "forward_paper_verified":False,"edge_proven":False,
