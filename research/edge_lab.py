@@ -8,13 +8,46 @@ import time
 import urllib.error
 from pathlib import Path
 from research.multi_market_observer import SYMBOLS, request_history
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timezone, timedelta
 from research.edge_session_calendar import eligible_cutoff, is_session, validate_sequence, CALENDAR_SHA256
 
 WARMUP = 200
 COST_PER_SIDE = 0.001  # conservative 10 basis points on each position transition
 INITIAL_CASH = 2000.0
 IDS = ("tsmom_63", "trend_200", "reversal_5")
+
+def forward_start(cutoff):
+    """Exactly 200 scheduled sessions, chosen before fetching any prices."""
+    day=cutoff; count=0
+    while True:
+        if is_session(day):
+            count+=1
+            if count==WARMUP:
+                return day.isoformat()
+        day-=timedelta(days=1)
+
+
+def evaluate_forward(symbol, raw, registry, *, now=None):
+    if symbol not in SYMBOLS or symbol not in registry["proxy_symbols"]:
+        raise ValueError("unregistered market proxy")
+    cutoff=eligible_cutoff(now); start=forward_start(cutoff)
+    if not isinstance(raw,list) or any(not isinstance(r,dict) or not start<=str(r.get("date",""))[:10]<=cutoff.isoformat() for r in raw):
+        raise ValueError("forward source outside predeclared request window")
+    bars=validate_open_bars(raw,now=now)
+    if len(bars)!=WARMUP or bars[0]["time"]!=start:
+        raise ValueError("incomplete forward lookback")
+    validate_sequence([b["time"] for b in bars],now=now,require_fresh=True)
+    return {"symbol":symbol,"status":"FORWARD_OPEN_INPUTS_ONLY",
+            "bars":len(bars),"first_date":start,"last_completed_date":bars[-1]["time"],
+            "price_field":"open_only","recent_opens":bars[-25:],
+            "open_series_sha256":hashlib.sha256(json.dumps(bars,sort_keys=True,separators=(",",":")).encode()).hexdigest(),
+            "strategies":[{"strategy_id":sid,"next_session_paper_signal":signal(sid,[b["open"] for b in bars]),
+                           "next_session_fill_verified":False,"edge_proven":False} for sid in IDS],
+            "historical_backtest_status":"NOT_RUN_IN_FORWARD_COLLECTION",
+            "orders_enabled":False,"edge_proven":False,"forward_paper_verified":False,
+            "warnings":["Exactly 200 sessions requested independently of source validity; no missing rows dropped or repaired.",
+                        "This is not a historical performance report or proof of executable fills.",
+                        "Older historical source defects remain unresolved; publication time is not attested."]}
 
 def fetch_with_transport_retries(fetch, args, attempts, *, sleep=time.sleep):
     """At most three reads; never retry prices, parsing, auth or permissions.
@@ -176,7 +209,9 @@ def diagnose_raw_bars(rows, *, now=None):
             return {"reason":"MALFORMED_OHLC","date":day}
     return {"reason":"DOWNSTREAM_VALIDATION_FAILURE"}
 
-def run(registry, token, *, fetch=request_history, now=None):
+def run(registry, token, *, fetch=request_history, now=None, mode="historical"):
+    if mode not in ("historical","forward"):
+        raise ValueError("unknown collection mode")
     if registry.get("schema") != "oracle-q-edge-registry-v1" or registry.get("enabled_for_execution") is not False:
         raise ValueError("invalid research-only edge registry")
     if {c["id"] for c in registry["candidates"] if c.get("testable_with_current_etf_data")} != set(IDS):
@@ -185,7 +220,7 @@ def run(registry, token, *, fetch=request_history, now=None):
         raise ValueError("missing read-only data credential")
     now = now or datetime.now(timezone.utc)
     cutoff=eligible_cutoff(now)
-    start=(cutoff-__import__("datetime").timedelta(days=850)).isoformat()
+    start=forward_start(cutoff) if mode=="forward" else (cutoff-timedelta(days=850)).isoformat()
     reports=[]
     for symbol in registry["proxy_symbols"]:
         raw=None
@@ -204,7 +239,8 @@ def run(registry, token, *, fetch=request_history, now=None):
                 "publication_at":None,"publication_time_verified":False,
                 "representation":"parsed history rows, not raw HTTP bytes",
                 "rows":raw}
-            evaluated=evaluate(symbol,raw,registry,now=now)
+            evaluator=evaluate_forward if mode=="forward" else evaluate
+            evaluated=evaluator(symbol,raw,registry,now=now)
             evaluated.update(source_fields)
             reports.append(evaluated)
         except (ValueError,KeyError,TypeError,TimeoutError,OSError) as exc:
@@ -218,7 +254,8 @@ def run(registry, token, *, fetch=request_history, now=None):
             reports.append({"symbol":symbol,"status":"DATA_OR_VALIDATION_FAILURE",
                             **source_fields,"error_type":type(exc).__name__,"diagnostic":detail,
                             "orders_enabled":False,"edge_proven":False})
-    return {"schema":"oracle-q-edge-lab-v1","status":"HISTORICAL_RESEARCH_ONLY",
+    return {"schema":"oracle-q-edge-lab-v1","status":"FORWARD_INPUT_RESEARCH_ONLY" if mode=="forward" else "HISTORICAL_RESEARCH_ONLY",
+            "collection_mode":mode,
             "observed_at":datetime.now(timezone.utc).isoformat(),
             "evaluation_cutoff_at":now.isoformat(),
             "calendar_sha256":CALENDAR_SHA256,
@@ -232,12 +269,14 @@ def main():
     p=argparse.ArgumentParser()
     p.add_argument("--registry",default="research/edge_registry.json")
     p.add_argument("--output",default="edge_lab_report.json")
+    p.add_argument("--mode",choices=("historical","forward"),default="historical")
     a=p.parse_args()
     registry=json.loads(Path(a.registry).read_text())
-    report=run(registry,os.getenv("TRADIER_TOKEN",""))
+    report=run(registry,os.getenv("TRADIER_TOKEN",""),mode=a.mode)
     Path(a.output).write_text(json.dumps(report,indent=2,sort_keys=True)+"\n")
     print("Edge lab:",[(r["symbol"],r["status"]) for r in report["reports"]])
-    if any(r["status"]!="HISTORICAL_OPEN_PROXY_BACKTEST_ONLY" for r in report["reports"]):
+    expected="FORWARD_OPEN_INPUTS_ONLY" if a.mode=="forward" else "HISTORICAL_OPEN_PROXY_BACKTEST_ONLY"
+    if any(r["status"]!=expected for r in report["reports"]):
         raise SystemExit(1)
 
 if __name__=="__main__":

@@ -91,7 +91,7 @@ def advance(previous,current, *, registered_at=None):
         events.append(body)
     source_sha=digest(current)
     for report in reports:
-        if report.get("status")!="HISTORICAL_OPEN_PROXY_BACKTEST_ONLY" or report.get("price_field")!="open_only":
+        if report.get("status") not in ("HISTORICAL_OPEN_PROXY_BACKTEST_ONLY","FORWARD_OPEN_INPUTS_ONLY") or report.get("price_field")!="open_only":
             raise ValueError("market report not validated for forward observation")
         symbol=report["symbol"]
         dates=report.get("recent_opens")

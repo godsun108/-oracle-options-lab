@@ -4,7 +4,7 @@ import json
 from datetime import timedelta
 from pathlib import Path
 from research.edge_forward_paper import digest, parse_utc_timestamp
-from research.edge_lab import evaluate
+from research.edge_lab import evaluate, evaluate_forward, forward_start
 from research.edge_session_calendar import eligible_cutoff, CALENDAR_SHA256
 
 
@@ -14,6 +14,10 @@ def audit(report, registry):
     cutoff_at = parse_utc_timestamp(report.get("evaluation_cutoff_at"))
     observed = parse_utc_timestamp(report.get("observed_at"))
     cutoff = eligible_cutoff(cutoff_at)
+    mode=report.get("collection_mode","historical")
+    if mode not in ("historical","forward"):
+        raise ValueError("unknown source collection mode")
+    request_start=forward_start(cutoff) if mode=="forward" else (cutoff-timedelta(days=850)).isoformat()
     if report.get("cutoff") != cutoff.isoformat() or report.get("calendar_sha256") != CALENDAR_SHA256:
         raise ValueError("source calendar mismatch")
     if cutoff_at > observed:
@@ -38,13 +42,15 @@ def audit(report, registry):
                 or evidence.get("publication_time_verified") is not False):
             raise ValueError("unsupported publication-time assertion")
         if (evidence.get("request_end_date") != cutoff.isoformat()
-                or evidence.get("request_start_date") != (cutoff-timedelta(days=850)).isoformat()):
+                or evidence.get("request_start_date") != request_start):
             raise ValueError("source request range mismatch")
         rows = evidence.get("rows")
         if digest(rows) != market.get("source_payload_sha256"):
             raise ValueError("source payload hash mismatch")
-        reproduced = evaluate(market["symbol"], rows, registry, now=cutoff_at)
-        if reproduced["status"] != "HISTORICAL_OPEN_PROXY_BACKTEST_ONLY":
+        evaluator=evaluate_forward if mode=="forward" else evaluate
+        reproduced = evaluator(market["symbol"], rows, registry, now=cutoff_at)
+        expected="FORWARD_OPEN_INPUTS_ONLY" if mode=="forward" else "HISTORICAL_OPEN_PROXY_BACKTEST_ONLY"
+        if reproduced["status"] != expected:
             raise ValueError("source insufficient for forward research")
         if any(market.get(key) != value for key, value in reproduced.items()):
             raise ValueError("source replay mismatch")

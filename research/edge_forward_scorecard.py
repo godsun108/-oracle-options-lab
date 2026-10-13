@@ -155,7 +155,7 @@ def main():
         raise ValueError("invalid research source")
     expected=[]
     for market in report["reports"]:
-        if market.get("status")!="HISTORICAL_OPEN_PROXY_BACKTEST_ONLY":
+        if market.get("status") not in ("HISTORICAL_OPEN_PROXY_BACKTEST_ONLY","FORWARD_OPEN_INPUTS_ONLY"):
             raise ValueError("invalid market research source")
         expected.extend((market["symbol"],s["strategy_id"]) for s in market["strategies"])
     result=score(ledger,expected_pairs=expected,as_of=datetime.now(timezone.utc).isoformat())
