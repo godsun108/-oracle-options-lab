@@ -4,6 +4,8 @@ import hashlib
 import json
 import math
 import os
+import time
+import urllib.error
 from pathlib import Path
 from research.multi_market_observer import SYMBOLS, request_history
 from datetime import date, datetime, timezone
@@ -13,6 +15,34 @@ WARMUP = 200
 COST_PER_SIDE = 0.001  # conservative 10 basis points on each position transition
 INITIAL_CASH = 2000.0
 IDS = ("tsmom_63", "trend_200", "reversal_5")
+
+def fetch_with_transport_retries(fetch, args, attempts, *, sleep=time.sleep):
+    """At most three reads; never retry prices, parsing, auth or permissions.
+
+    Trace contains only allowlisted metadata, never exception messages/headers.
+    Successful responses are evaluated once, outside this transport wrapper.
+    """
+    for number in range(1, 4):
+        attempt = {"attempt":number, "started_at":datetime.now(timezone.utc).isoformat()}
+        try:
+            rows = fetch(*args)
+        except (urllib.error.URLError, TimeoutError, ConnectionResetError, ValueError, TypeError, KeyError) as exc:
+            status = exc.code if isinstance(exc, urllib.error.HTTPError) else None
+            retryable = (status in (502,503,504) if status is not None else
+                         isinstance(exc,(TimeoutError,ConnectionResetError)) or
+                         isinstance(getattr(exc,"reason",None),(TimeoutError,ConnectionResetError)))
+            attempt.update({"finished_at":datetime.now(timezone.utc).isoformat(),
+                            "status":"FETCH_FAILED", "error_type":type(exc).__name__,
+                            "http_status":status,"retry_scheduled":retryable and number<3})
+            attempts.append(attempt)
+            if not retryable or number==3:
+                raise
+            sleep(number)  # fixed 1s, 2s; never retry until a dataset passes
+        else:
+            attempt.update({"finished_at":datetime.now(timezone.utc).isoformat(),
+                            "status":"RESPONSE_RECEIVED","retry_scheduled":False})
+            attempts.append(attempt)
+            return rows
 
 def signal(strategy, closes):
     if len(closes) < WARMUP:
@@ -159,10 +189,10 @@ def run(registry, token, *, fetch=request_history, now=None):
     reports=[]
     for symbol in registry["proxy_symbols"]:
         raw=None
-        source_fields={}
+        source_fields={"fetch_attempts":[]}
         try:
             request_started_at=datetime.now(timezone.utc).isoformat()
-            raw=fetch(symbol,token,start,cutoff.isoformat())
+            raw=fetch_with_transport_retries(fetch,(symbol,token,start,cutoff.isoformat()),source_fields["fetch_attempts"])
             received_at=datetime.now(timezone.utc).isoformat()
             source_fields["source_received_at"]=received_at
             source_fields["source_payload_sha256"]=hashlib.sha256(json.dumps(raw,sort_keys=True,separators=(",",":"),allow_nan=False).encode()).hexdigest()
