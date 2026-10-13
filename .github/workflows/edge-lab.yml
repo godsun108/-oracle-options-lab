@@ -87,11 +87,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Backtest published-edge ETF proxies with read-only Tradier bars
+      - name: Collect fixed-lookback forward inputs with read-only Tradier bars
         id: collect
         env:
           TRADIER_TOKEN: ${{ secrets.TRADIER_TOKEN }}
-        run: python -m research.edge_lab --registry research/edge_registry.json --output edge_lab_report.json
+        run: python -m research.edge_lab --mode forward --registry research/edge_registry.json --output edge_lab_report.json
       - name: Diagnose rejected historical opens without changing research data
         if: failure() && steps.collect.outcome == 'failure'
         env:
@@ -124,6 +124,7 @@ jobs:
           with open(os.environ["GITHUB_STEP_SUMMARY"],"a") as f:
               f.write("\n### Oracle-Q multi-market edge lab (read-only)\n")
               f.write("Historical backtests are not forward paper performance or verified edges.\n")
+              f.write("This workflow collects exactly 200 sessions for unchanged forward signals; it does not rerun the long historical backtest. Known older history defects are not repaired.\n")
               for r in data.get("reports",[]):
                   f.write(f"- {r.get('symbol')}: {r.get('status')}; bars: {r.get('bars','unavailable')}; diagnostic: {r.get('diagnostic',r.get('source_ohlc_diagnostic',{})).get('reason','none')}\n")
               scorecard=Path("edge_forward_scorecard.json")

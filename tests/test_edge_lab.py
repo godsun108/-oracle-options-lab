@@ -5,6 +5,7 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from research.edge_lab import signal, segment, evaluate, run, diagnose_raw_bars, validate_open_bars
 from research.edge_lab import fetch_with_transport_retries
+from research.edge_lab import evaluate_forward, forward_start
 
 from research.edge_session_calendar import is_session
 
@@ -23,6 +24,54 @@ def bars(n=420):
             for i,day in enumerate(reversed(sessions))]
 
 class EdgeLabTests(unittest.TestCase):
+    def test_forward_window_preserves_every_strategy_signal(self):
+        raw=bars(420)
+        historical=evaluate("SPY",raw,REGISTRY,now=NOW)
+        forward=evaluate_forward("SPY",raw[-200:],REGISTRY,now=NOW)
+        self.assertEqual(forward["bars"],200)
+        self.assertNotIn("holdout_start",forward)
+        self.assertEqual(forward_start(NOW.date()),raw[-200]["date"])
+        self.assertEqual([x["next_session_paper_signal"] for x in historical["strategies"]],
+                         [x["next_session_paper_signal"] for x in forward["strategies"]])
+        # Also compare declining and oscillating inputs, not only an uptrend.
+        for prices in ([500-i for i in range(420)],[100+i%11 for i in range(420)]):
+            for row,price in zip(raw,prices):row["open"]=price
+            h=evaluate("SPY",raw,REGISTRY,now=NOW)
+            f=evaluate_forward("SPY",raw[-200:],REGISTRY,now=NOW)
+            self.assertEqual([x["next_session_paper_signal"] for x in h["strategies"]],
+                             [x["next_session_paper_signal"] for x in f["strategies"]])
+
+    def test_forward_window_is_chosen_before_fetch_and_replayed(self):
+        from research.edge_source_replay import audit
+        calls=[];raw=bars(200)
+        def fetch(*args):calls.append(args);return raw
+        result=run(REGISTRY,"token",fetch=fetch,now=NOW,mode="forward")
+        self.assertTrue(all(x[2:]==(raw[0]["date"],raw[-1]["date"]) for x in calls))
+        self.assertEqual(audit(result,REGISTRY)["status"],"SOURCE_REPLAY_MATCHED")
+
+    def test_forward_missing_invalid_extra_or_stale_bars_fail_closed(self):
+        import copy
+        raw=bars(200)
+        invalid=copy.deepcopy(raw);invalid[10]["open"]="NaN"
+        for bad in (invalid,raw[1:],raw[:-1],bars(201),raw+[raw[-1]]):
+            with self.assertRaises(ValueError):evaluate_forward("SPY",bad,REGISTRY,now=NOW)
+
+    def test_old_defect_still_blocks_historical_mode(self):
+        raw=bars(420);raw[0]["open"]="NaN"
+        with self.assertRaises(ValueError):evaluate("SPY",raw,REGISTRY,now=NOW)
+        # Separate inputs, not an automatic retry/fallback after that failure.
+        self.assertEqual(evaluate_forward("SPY",raw[-200:],REGISTRY,now=NOW)["status"],"FORWARD_OPEN_INPUTS_ONLY")
+
+    def test_forward_mode_preserves_existing_ledger_on_same_session(self):
+        from research.edge_forward_paper import advance
+        current={"schema":"oracle-q-edge-lab-v1","orders_enabled":False,"edge_proven":False,
+                 "observed_at":NOW.isoformat(),"reports":[evaluate("SPY",bars(420),REGISTRY,now=NOW)]}
+        prior=advance(None,current)
+        current["reports"]=[evaluate_forward("SPY",bars(420)[-200:],REGISTRY,now=NOW)]
+        after=advance(prior,current)
+        self.assertEqual(prior["events"],after["events"])
+        self.assertEqual(prior["head_sha256"],after["head_sha256"])
+
     def test_transport_retries_are_bounded_and_recorded(self):
         trace=[]; delays=[]; calls=[]
         def fetch():
