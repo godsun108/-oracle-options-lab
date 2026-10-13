@@ -159,14 +159,14 @@ def run(registry, token, *, fetch=request_history, now=None):
     reports=[]
     for symbol in registry["proxy_symbols"]:
         raw=None
+        source_fields={}
         try:
             request_started_at=datetime.now(timezone.utc).isoformat()
             raw=fetch(symbol,token,start,cutoff.isoformat())
             received_at=datetime.now(timezone.utc).isoformat()
-            evaluated=evaluate(symbol,raw,registry,now=now)
-            evaluated["source_received_at"]=received_at
-            evaluated["source_payload_sha256"]=hashlib.sha256(json.dumps(raw,sort_keys=True,separators=(",",":"),allow_nan=False).encode()).hexdigest()
-            evaluated["source_evidence"]={
+            source_fields["source_received_at"]=received_at
+            source_fields["source_payload_sha256"]=hashlib.sha256(json.dumps(raw,sort_keys=True,separators=(",",":"),allow_nan=False).encode()).hexdigest()
+            source_fields["source_evidence"]={
                 "schema":"oracle-q-parsed-history-evidence-v1",
                 "symbol":symbol,"provider":"tradier",
                 "request_start_date":start,"request_end_date":cutoff.isoformat(),
@@ -174,11 +174,19 @@ def run(registry, token, *, fetch=request_history, now=None):
                 "publication_at":None,"publication_time_verified":False,
                 "representation":"parsed history rows, not raw HTTP bytes",
                 "rows":raw}
+            evaluated=evaluate(symbol,raw,registry,now=now)
+            evaluated.update(source_fields)
             reports.append(evaluated)
         except (ValueError,KeyError,TypeError,TimeoutError,OSError) as exc:
+            if raw is not None and "source_evidence" not in source_fields:
+                # Preserve nonstandard parsed values as text, never corrected rows.
+                rejected=json.dumps(raw,sort_keys=True,separators=(",",":"),allow_nan=True)
+                source_fields["rejected_parsed_payload_text"]=rejected
+                source_fields["rejected_parsed_payload_text_sha256"]=hashlib.sha256(rejected.encode()).hexdigest()
+                source_fields["rejected_payload_format"]="Python JSON text; may contain NaN/Infinity; not eligible source evidence"
             detail=diagnose_raw_bars(raw,now=now) if raw is not None else {"reason":"FETCH_UNAVAILABLE"}
             reports.append({"symbol":symbol,"status":"DATA_OR_VALIDATION_FAILURE",
-                            "error_type":type(exc).__name__,"diagnostic":detail,
+                            **source_fields,"error_type":type(exc).__name__,"diagnostic":detail,
                             "orders_enabled":False,"edge_proven":False})
     return {"schema":"oracle-q-edge-lab-v1","status":"HISTORICAL_RESEARCH_ONLY",
             "observed_at":datetime.now(timezone.utc).isoformat(),

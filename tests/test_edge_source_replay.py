@@ -11,6 +11,19 @@ class SourceReplayTests(unittest.TestCase):
     def setUpClass(cls):
         cls.report=run(REGISTRY,"synthetic-token",fetch=lambda *args:bars(330),now=NOW)
 
+    def test_rejected_rows_are_retained_without_becoming_valid_evidence(self):
+        for bad in (0.0,float("nan")):
+            raw=bars(330);raw[12]["open"]=bad
+            report=run(REGISTRY,"synthetic-token",fetch=lambda *args:raw,now=NOW)
+            market=report["reports"][0]
+            self.assertEqual(market["status"],"DATA_OR_VALIDATION_FAILURE")
+            if bad==0:
+                self.assertEqual(market["source_evidence"]["rows"][12]["open"],0)
+            else:
+                self.assertIn("NaN",market["rejected_parsed_payload_text"])
+                self.assertNotIn("source_evidence",market)
+            with self.assertRaises(ValueError):audit(report,REGISTRY)
+
     def test_all_signals_reproduced_without_publication_claim(self):
         result=audit(self.report,REGISTRY)
         self.assertEqual(len(result["markets"]),6)
