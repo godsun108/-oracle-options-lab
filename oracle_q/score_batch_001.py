@@ -10,6 +10,7 @@ import numpy as np, pandas as pd
 from sklearn.linear_model import LogisticRegression, Ridge
 from sklearn.preprocessing import StandardScaler
 from oracle_q.regime_features import build_regime_features
+from oracle_q.walk_forward import available_training_rows
 
 BASE=["ret_5","ret_20","dist_ma20","dist_ma50","dist_ma200"]
 CONTRACT=["dte","entry_delta","spread_pct","premium_pct_spot","moneyness","log_open_interest"]
@@ -46,8 +47,10 @@ def prepare():
 
 def walk(g,features,target):
     g=g.sort_values("signal_date").reset_index(drop=True); out=[]
-    for i in range(MIN_TRAIN,len(g)):
-        train=g.iloc[:i]; row=g.iloc[[i]]
+    for i in range(len(g)):
+        row=g.iloc[[i]]
+        train=available_training_rows(g,row.signal_date.iloc[0],date_col="signal_date")
+        if len(train)<MIN_TRAIN: continue
         X=train[features].astype(float); z=row[features].astype(float)
         if X.isna().any().any() or z.isna().any().any(): continue
         sc=StandardScaler().fit(X); Xt=sc.transform(X); zt=sc.transform(z)
@@ -60,8 +63,8 @@ def walk(g,features,target):
             y=train.option_return.astype(float)
             model=Ridge(alpha=L2).fit(Xt,y); pred=float(model.predict(zt)[0])
         out.append({"signal_date":row.signal_date.iloc[0],"pred":pred,
-                    "option_return":float(row.option_return.iloc[0]),"one_contract_pnl":float(row.one_contract_pnl.iloc[0])})
-    return pd.DataFrame(out)
+                    "n_train":len(train),"option_return":float(row.option_return.iloc[0]),"one_contract_pnl":float(row.one_contract_pnl.iloc[0])})
+    return pd.DataFrame(out,columns=["signal_date","pred","n_train","option_return","one_contract_pnl"])
 
 def econ(q,select):
     q=q.loc[select(q)].copy(); r=q.option_return.astype(float)
@@ -90,7 +93,10 @@ def main():
             e=econ(h,lambda z:z.pred>0)
             forecast={"mse":float(np.mean((h.option_return-h.pred)**2)) if len(h) else None}
         results.append({"candidate":c,"n_predictions":len(q),"historical_2022_2025":e,"forecast":forecast})
-    out={"schema":"oracle.q.batch.001.score.v1","status":"BURNED_HISTORY_DISCOVERY_ONLY",
+    out={"schema":"oracle.q.batch.001.score.v2","status":"BURNED_HISTORY_DISCOVERY_ONLY",
+      "training_chronology":"Signals and exit labels must precede each decision; date-only exits excluded through exit day.",
+      "feature_timing_verified":False,"eligible_for_live_trading":False,
+      "limitations":["Same-day closing features and entry-contract features lack decision-time availability proof.","Macro as-of dates alone do not prove publication time or vintage safety.","Historical replay is not forward evidence."],
       "batch_id":manifest["batch_id"],"results":results,
       "promotion_boundary":"No historical result can establish an edge. Any survivor must be frozen before genuinely future paper-forward evidence."}
     Path("out").mkdir(exist_ok=True);Path("out/oracle_q_batch_001_scores.json").write_text(json.dumps(out,indent=2)+chr(10))
