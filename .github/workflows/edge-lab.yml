@@ -61,7 +61,9 @@ permissions:
   actions: read
 
 concurrency:
-  group: oracle-q-edge-lab
+  # PR tests never write production evidence and must not block its queue.
+  # All production triggers still share one serialized ledger-writing group.
+  group: ${{ github.event_name == 'pull_request' && format('oracle-q-edge-lab-pr-{0}', github.event.pull_request.number) || 'oracle-q-edge-lab' }}
   cancel-in-progress: false
 
 jobs:
