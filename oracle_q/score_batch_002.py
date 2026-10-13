@@ -7,6 +7,7 @@ from sklearn.linear_model import LogisticRegression,Ridge
 from sklearn.preprocessing import StandardScaler
 from oracle_q.regime_features import build_regime_features
 from oracle_q.walk_forward import available_training_rows
+from oracle_q.feature_timing import validate_feature_timing
 TREND=["ret_5","ret_20","dist_ma20","dist_ma50","dist_ma200"]
 VOL=["rv10","rv20","rv60","vol_ratio_10_60"];VOLUME=["volume_ratio20"]
 CONTRACT=["dte","entry_delta","spread_pct","premium_pct_spot","moneyness","log_open_interest"]
@@ -34,6 +35,7 @@ def prep():
  return tr
 
 def walk(g,fs,target):
+ validate_feature_timing(g,fs,signal_date_col="signal_date")
  g=g.sort_values("signal_date").reset_index(drop=True);o=[]
  for i in range(len(g)):
   b=g.iloc[[i]]

@@ -15,6 +15,9 @@ class BatchScorerChronologyTests(unittest.TestCase):
         dates = pd.date_range("2026-01-01", periods=20)
         return pd.DataFrame({
             "signal_date": dates, "exit_date": dates + pd.Timedelta(days=3),
+            "decision_at": dates.tz_localize("UTC"),
+            "feature__published_at": (dates - pd.Timedelta(days=1)).tz_localize("UTC"),
+            "feature__observed_at": (dates - pd.Timedelta(hours=1)).tz_localize("UTC"),
             "feature": np.arange(20) % 3,
             "option_return": np.where(np.arange(20) % 2, .1, -.1),
             "one_contract_pnl": np.where(np.arange(20) % 2, 10., -10.),
