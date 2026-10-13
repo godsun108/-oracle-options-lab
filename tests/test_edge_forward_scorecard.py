@@ -5,6 +5,37 @@ from research.edge_forward_scorecard import score,MIN_OUTCOMES_FOR_REVIEW
 from tests.test_edge_forward_paper import report
 
 class ForwardScorecardTests(unittest.TestCase):
+    def test_maturity_uses_holiday_and_early_close_calendar(self):
+        ledger=advance(None,report("2026-11-24",[("2026-11-24",100.0)]))
+        pending=score(ledger,as_of="2026-11-27T18:14:59Z")["maturity"]["pending"]
+        self.assertEqual(pending[0]["exit_session"],"2026-11-27")
+        self.assertEqual(pending[0]["earliest_data_eligibility_utc"],"2026-11-27T18:15:00+00:00")
+        self.assertEqual(pending[0]["status"],"WAITING_FOR_DAILY_BAR_ELIGIBILITY")
+
+    def test_pending_maturity_never_creates_outcomes(self):
+        ledger=advance(None,report("2026-10-05",[("2026-10-05",100.0)]))
+        for stamp,status in [("2026-10-06T13:29:00Z","WAITING_FOR_ENTRY_SESSION"),
+                             ("2026-10-06T13:30:00Z","WAITING_FOR_EXIT_SESSION"),
+                             ("2026-10-07T13:30:00Z","WAITING_FOR_DAILY_BAR_ELIGIBILITY"),
+                             ("2026-10-07T20:15:00Z","ELIGIBLE_AWAITING_VALIDATED_DATA_OR_SETTLEMENT")]:
+            with self.subTest(stamp=stamp):
+                result=score(ledger,as_of=stamp)
+                self.assertEqual(result["outcomes_total"],0)
+                self.assertTrue(all(x["status"]==status for x in result["maturity"]["pending"]))
+                self.assertEqual(result["maturity"]["pending"][0]["exit_session"],"2026-10-07")
+
+    def test_maturity_rejects_backdated_or_naive_snapshot(self):
+        ledger=advance(None,report("2026-10-05",[("2026-10-05",100.0)]))
+        for stamp in ("2026-10-04T00:00:00Z","2026-10-07"):
+            with self.assertRaises(ValueError):score(ledger,as_of=stamp)
+
+    def test_maturity_removes_settled_signals(self):
+        a=advance(None,report("2026-10-05",[("2026-10-05",100.0)]))
+        b=advance(a,report("2026-10-07",[("2026-10-05",100.0),("2026-10-06",101.0),("2026-10-07",103.0)]))
+        result=score(b,as_of="2026-10-07T22:00:00Z")
+        self.assertEqual(result["outcomes_total"],2)
+        self.assertTrue(all(x["signal_date"]=="2026-10-07" for x in result["maturity"]["pending"]))
+
     def test_empty_forward_signals_never_promoted(self):
         ledger=advance(None,report("2026-10-05",[("2026-10-05",100.0)]))
         summary=score(ledger,expected_pairs=[("SPY","tsmom_63"),("SPY","trend_200")])
