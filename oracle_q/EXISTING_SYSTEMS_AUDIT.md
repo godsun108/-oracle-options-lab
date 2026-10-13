@@ -9,7 +9,7 @@ Inspected October 13, 2026. Research only; live orders remain disabled.
 | `edge_search_batch*.py` | Three design-only candidate manifest generators | Historical winners require separate future evidence |
 | `regime_features.py` | Trend, rolling volatility and volume features | Not a validated regime-switching trading policy; feature availability needs independent audit |
 | `walk_forward.py` | Regularized probability model and unconditional baseline | This patch purges unavailable labels; it does not validate features or macro vintages |
-| `score_batch_001.py`, `score_batch_002.py` | Separate historical walk-forward scorers | Still select training rows by signal order; label maturity and entry-time feature use need repair before reuse |
+| `score_batch_001.py`, `score_batch_002.py` | Separate historical walk-forward scorers | Training now excludes unavailable exit labels and same-time signals; entry-time feature use still needs repair before reuse |
 | `seldon_sidecar.py` | Research-only attachment, date/vintage checks | A vintage-safe flag alone does not independently attest provider data |
 | `options_edge_gate.py` | Can reject a candidate with `NO_TRADE` | Historical gate is not authorization or proof of profitability |
 | `research/edge_*` | Timestamped six-market paper ledger, continuity audit and cost stresses | No completed forward outcomes at last verified production run 38323178714 |
@@ -36,8 +36,16 @@ Floating-point differences can alter annealing paths. The lower objective in the
 
 ## Next integration gates
 
-1. Repair and regression-test outcome maturity and feature availability in older batch scorers before rerunning historical experiments.
+1. Audit feature availability in older batch scorers before rerunning historical experiments; label-maturity regression coverage is now present.
 2. Freeze prospective regime snapshots before future outcomes; do not backfill labels onto older signals as if recorded then.
 3. Compare regime policies against the existing fixed strategies and cash, accounting for all tried variants.
 4. Preserve abstention when data or evidence is insufficient. Cash avoids market exposure but is not guaranteed real profit; any interest model requires actual account terms and separate evidence.
 5. Keep portfolio and execution risk limits separate from optimizer output. Human approval is required before live trading.
+
+## Batch scorer chronology follow-up
+
+Both batch scorers now use the shared label-availability filter before fitting the scaler or model. The 100-observation minimum counts only mature labels, and duplicate signal dates cannot train on one another. Empty results preserve the columns needed by report generation. Missing or impossible exit dates fail closed. The regression tests mutate unavailable outcomes and verify unchanged earlier predictions for both probability and regression targets.
+
+Version-2 reports explicitly state that feature timing is unverified and live-trading eligibility is false. An exit date is a conservative historical label proxy, not proof of source publication time. Same-day closing-price features, entry-contract features, and macro publication/vintage provenance remain unresolved. These scorers are not cleared for prospective decisions.
+
+Historical replay workflows are now manual-only: a code push must not automatically generate a new historical score from pinned external artifacts and an unpinned market-data URL. Oracle Guardrails still runs the deterministic regression suite automatically on pushes and pull requests, including these scorers' existing scikit-learn dependency. No historical scores, manifests, or forward-ledger events are rewritten.

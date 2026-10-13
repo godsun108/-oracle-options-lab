@@ -1,10 +1,8 @@
 name: Oracle Q Score Batch 001
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - "oracle_q/score_batch_001.py"
-      - ".github/workflows/oracle-q-score-batch-001.yml"
+  # Historical replay consumes pinned external artifacts; run explicitly.
+  # Code changes are covered by Oracle Guardrails synthetic regression tests.
 permissions:
   contents: read
   actions: read
