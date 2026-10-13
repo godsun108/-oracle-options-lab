@@ -8,7 +8,7 @@ from research.edge_lab import evaluate, evaluate_forward, forward_start
 from research.edge_session_calendar import eligible_cutoff, CALENDAR_SHA256
 
 
-def audit(report, registry):
+def audit(report, registry, *, allow_partial=False):
     if report.get("schema") != "oracle-q-edge-lab-v1" or report.get("orders_enabled") is not False or report.get("edge_proven") is not False:
         raise ValueError("invalid research report")
     cutoff_at = parse_utc_timestamp(report.get("evaluation_cutoff_at"))
@@ -25,8 +25,11 @@ def audit(report, registry):
     markets = report.get("reports", [])
     if sorted(r["symbol"] for r in markets) != sorted(registry["proxy_symbols"]):
         raise ValueError("source markets missing or duplicated")
-    checked = []
+    checked = []; blocked=[]
     for market in markets:
+        if allow_partial and mode=="forward" and market.get("status")=="DATA_OR_VALIDATION_FAILURE":
+            blocked.append(market["symbol"])
+            continue  # Explicitly ineligible; cannot enter the ledger loop.
         evidence = market.get("source_evidence", {})
         if (evidence.get("schema") != "oracle-q-parsed-history-evidence-v1"
                 or evidence.get("provider") != "tradier"
@@ -56,7 +59,10 @@ def audit(report, registry):
             raise ValueError("source replay mismatch")
         checked.append({"symbol":market["symbol"], "source_payload_sha256":digest(rows),
                         "strategies_replayed":len(reproduced["strategies"])})
-    return {"schema":"oracle-q-source-replay-v1", "status":"SOURCE_REPLAY_MATCHED",
+    if not checked:
+        raise ValueError("no validated markets")
+    return {"schema":"oracle-q-source-replay-v1", "status":"PARTIAL_SOURCE_REPLAY_MATCHED" if blocked else "SOURCE_REPLAY_MATCHED",
+            "blocked_markets":blocked,
             "report_sha256":digest(report), "markets":checked,
             "publication_time_verified":False,"provider_authenticity_verified":False,
             "eligible_for_live_trading":False,
@@ -68,8 +74,9 @@ def main():
     parser.add_argument("--report",required=True)
     parser.add_argument("--registry",default="research/edge_registry.json")
     parser.add_argument("--output",default="edge_source_replay.json")
+    parser.add_argument("--allow-partial",action="store_true")
     args=parser.parse_args()
-    result=audit(json.loads(Path(args.report).read_text()),json.loads(Path(args.registry).read_text()))
+    result=audit(json.loads(Path(args.report).read_text()),json.loads(Path(args.registry).read_text()),allow_partial=args.allow_partial)
     Path(args.output).write_text(json.dumps(result,indent=2,sort_keys=True)+"\n")
     print("Source replay:",result["status"],len(result["markets"]),"markets")
 

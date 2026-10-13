@@ -5,6 +5,7 @@ import json
 import math
 from datetime import datetime, timezone
 from pathlib import Path
+from research.multi_market_observer import SYMBOLS
 from research.edge_session_calendar import session_bounds, expected_entry_exit, validate_sequence, CALENDAR_SHA256
 
 def digest(value):
@@ -42,7 +43,7 @@ def parse_utc_timestamp(value):
 def session_open_utc(day):
     return session_bounds(day)[0]
 
-def advance(previous,current, *, registered_at=None):
+def advance(previous,current, *, registered_at=None, allow_partial=False):
     if current.get("schema")!="oracle-q-edge-lab-v1" or current.get("orders_enabled") is not False or current.get("edge_proven") is not False:
         raise ValueError("untrusted research report")
     observed_at=parse_utc_timestamp(current.get("observed_at"))
@@ -52,6 +53,8 @@ def advance(previous,current, *, registered_at=None):
     reports=current.get("reports")
     if not isinstance(reports,list) or not reports:
         raise ValueError("no market reports")
+    if allow_partial and sorted(r["symbol"] for r in reports)!=sorted(SYMBOLS):
+        raise ValueError("partial processing requires complete market coverage")
     events=verify(previous)
     registered={}
     settled=set()
@@ -90,7 +93,11 @@ def advance(previous,current, *, registered_at=None):
         head=body["event_sha256"]
         events.append(body)
     source_sha=digest(current)
+    blocked=[]
     for report in reports:
+        if allow_partial and current.get("collection_mode")=="forward" and report.get("status")=="DATA_OR_VALIDATION_FAILURE":
+            blocked.append(report["symbol"])
+            continue
         if report.get("status") not in ("HISTORICAL_OPEN_PROXY_BACKTEST_ONLY","FORWARD_OPEN_INPUTS_ONLY") or report.get("price_field")!="open_only":
             raise ValueError("market report not validated for forward observation")
         symbol=report["symbol"]
@@ -178,7 +185,10 @@ def advance(previous,current, *, registered_at=None):
                  "source_report_sha256":source_sha,
                  "orders_enabled":False,"fill_verified":False})
             settled.add(key)
+    if len(blocked)==len(reports):
+        raise ValueError("no validated markets")
     return {"schema":"oracle-q-edge-forward-paper-v1",
+            "blocked_markets":blocked,
             "status":"FORWARD_PAPER_OBSERVATIONS_IN_PROGRESS",
             "orders_enabled":False,"fill_verified":False,"edge_proven":False,
             "events":events,"events_recorded":len(events),"head_sha256":head,
@@ -193,10 +203,11 @@ def main():
     p.add_argument("--current",required=True)
     p.add_argument("--prior")
     p.add_argument("--output",required=True)
+    p.add_argument("--allow-partial",action="store_true")
     a=p.parse_args()
     current=json.loads(Path(a.current).read_text())
     prior=json.loads(Path(a.prior).read_text()) if a.prior else None
-    result=advance(prior,current,registered_at=datetime.now(timezone.utc).isoformat())
+    result=advance(prior,current,registered_at=datetime.now(timezone.utc).isoformat(),allow_partial=a.allow_partial)
     Path(a.output).write_text(json.dumps(result,indent=2,sort_keys=True)+"\n")
     print("Forward paper observations:",result["signals_registered"],"registered;",
           result["outcomes_observed"],"observed; pending:",result["pending_signals"])

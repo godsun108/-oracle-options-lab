@@ -14,6 +14,8 @@ from datetime import datetime, timezone
 from research.edge_forward_paper import verify, parse_utc_timestamp
 from research.edge_session_calendar import expected_entry_exit, session_bounds, PUBLICATION_BUFFER
 from research.edge_forward_uncertainty import assess
+from research.edge_lab import IDS
+from research.multi_market_observer import SYMBOLS
 
 MIN_OUTCOMES_FOR_REVIEW = 60
 
@@ -143,28 +145,49 @@ def score(ledger, *, expected_pairs=None, as_of=None):
         result["maturity"] = pending_schedule(events, as_of)
     return result
 
+def score_report(ledger, report, *, as_of, allow_partial=False):
+    if report.get("schema")!="oracle-q-edge-lab-v1" or report.get("orders_enabled") is not False:
+        raise ValueError("invalid research source")
+    expected=[]
+    blocked=[]
+    if sorted(m["symbol"] for m in report["reports"])!=sorted(SYMBOLS):
+        raise ValueError("scorecard requires complete market coverage")
+    for market in report["reports"]:
+        if allow_partial and report.get("collection_mode")=="forward" and market.get("status")=="DATA_OR_VALIDATION_FAILURE":
+            blocked.append(market["symbol"])
+            expected.extend((market["symbol"],sid) for sid in IDS)
+            continue
+        if market.get("status") not in ("HISTORICAL_OPEN_PROXY_BACKTEST_ONLY","FORWARD_OPEN_INPUTS_ONLY"):
+            raise ValueError("invalid market research source")
+        if sorted(s["strategy_id"] for s in market["strategies"])!=sorted(IDS):
+            raise ValueError("scorecard requires complete strategy coverage")
+        expected.extend((market["symbol"],sid) for sid in IDS)
+    if len(blocked)==len(SYMBOLS):
+        raise ValueError("no validated markets")
+    result=score(ledger,expected_pairs=expected,as_of=as_of)
+    result["blocked_markets"]=blocked
+    result["collection_health"]="PARTIAL_MARKET_DATA" if blocked else "ALL_MARKETS_VALIDATED"
+    for pair in result["pairs"]:
+        pair["current_market_data_status"]="BLOCKED" if pair["symbol"] in blocked else "VALIDATED"
+    return result
+
 def main():
     parser=argparse.ArgumentParser()
     parser.add_argument("--ledger",required=True)
     parser.add_argument("--report",required=True)
     parser.add_argument("--output",required=True)
+    parser.add_argument("--allow-partial",action="store_true")
     args=parser.parse_args()
     ledger=json.loads(Path(args.ledger).read_text())
     report=json.loads(Path(args.report).read_text())
-    if report.get("schema")!="oracle-q-edge-lab-v1" or report.get("orders_enabled") is not False:
-        raise ValueError("invalid research source")
-    expected=[]
-    for market in report["reports"]:
-        if market.get("status") not in ("HISTORICAL_OPEN_PROXY_BACKTEST_ONLY","FORWARD_OPEN_INPUTS_ONLY"):
-            raise ValueError("invalid market research source")
-        expected.extend((market["symbol"],s["strategy_id"]) for s in market["strategies"])
-    result=score(ledger,expected_pairs=expected,as_of=datetime.now(timezone.utc).isoformat())
+    result=score_report(ledger,report,as_of=datetime.now(timezone.utc).isoformat(),allow_partial=args.allow_partial)
     Path(args.output).write_text(json.dumps(result,indent=2,sort_keys=True)+"\n")
     print("Forward scorecard:",len(result["pairs"]),"pairs,",result["outcomes_total"],"outcomes, no proven edge")
     states=defaultdict(int)
     for item in result["maturity"]["pending"]:
         states[item["status"]]+=1
     print("Forward maturity:",json.dumps(dict(states),sort_keys=True))
+    print("Collection health:",result["collection_health"],"blocked:",result["blocked_markets"])
 
 if __name__=="__main__":
     main()

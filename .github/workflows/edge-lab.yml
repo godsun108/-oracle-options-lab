@@ -91,26 +91,26 @@ jobs:
         id: collect
         env:
           TRADIER_TOKEN: ${{ secrets.TRADIER_TOKEN }}
-        run: python -m research.edge_lab --mode forward --registry research/edge_registry.json --output edge_lab_report.json
+        run: python -m research.edge_lab --mode forward --allow-partial --registry research/edge_registry.json --output edge_lab_report.json
       - name: Diagnose rejected historical opens without changing research data
-        if: failure() && steps.collect.outcome == 'failure'
+        if: always() && steps.collect.outcome != 'skipped'
         env:
           TRADIER_TOKEN: ${{ secrets.TRADIER_TOKEN }}
         run: python -m research.edge_history_diagnostic --report edge_lab_report.json --output edge_history_diagnostic.json
       - name: Replay signals from retained source evidence before ledger writes
-        run: python -m research.edge_source_replay --report edge_lab_report.json --output edge_source_replay.json
+        run: python -m research.edge_source_replay --report edge_lab_report.json --output edge_source_replay.json --allow-partial
       - name: Restore previous hash-linked forward paper observations
         env:
           GH_TOKEN: ${{ github.token }}
         run: python -m research.edge_evidence_restore --directory edge-restore
       - name: Append and settle delayed forward paper observations
-        run: python -m research.edge_forward_paper --current edge_lab_report.json --prior edge-restore/edge_forward_ledger.json --output edge_forward_ledger.json
+        run: python -m research.edge_forward_paper --current edge_lab_report.json --prior edge-restore/edge_forward_ledger.json --output edge_forward_ledger.json --allow-partial
       - name: Audit forward ledger chronology and observed-price arithmetic
         run: python -m research.edge_forward_integrity_audit --ledger edge_forward_ledger.json --output edge_forward_integrity_audit.json
       - name: Verify cross-run event prefix continuity
         run: python -m research.edge_evidence_restore --prior edge-restore/edge_forward_ledger.json --current edge_forward_ledger.json --output edge_forward_continuity.json
       - name: Score paired delayed forward paper outcomes
-        run: python -m research.edge_forward_scorecard --ledger edge_forward_ledger.json --report edge_lab_report.json --output edge_forward_scorecard.json
+        run: python -m research.edge_forward_scorecard --ledger edge_forward_ledger.json --report edge_lab_report.json --output edge_forward_scorecard.json --allow-partial
       - name: Stress fixed hypothetical execution costs
         run: python -m research.edge_execution_sensitivity --ledger edge_forward_ledger.json --output edge_execution_sensitivity.json
       - name: Summarize research without promoting historical backtests to proven edges
@@ -131,6 +131,7 @@ jobs:
               if scorecard.exists():
                   sc=json.loads(scorecard.read_text())
                   f.write(f"Forward scorecard: {sc.get('outcomes_total',0)} settled observations across {len(sc.get('pairs',[]))} strategy-market pairs; excluded untimed signals: {sc.get('signals_excluded_timing',0)}.\\n")
+                  f.write(f"Collection health: {sc.get('collection_health','UNKNOWN')}; blocked markets: {sc.get('blocked_markets',[])}\n")
                   for pair in sc.get("pairs",[]):
                       f.write(f"- {pair['symbol']} / {pair['strategy_id']}: {pair['outcomes_observed']} settled, {pair['pending']} pending, {pair.get('signals_excluded_timing',0)} excluded for missing timing; status: {pair['status']}\\n")
               audit_path=Path("edge_forward_integrity_audit.json")
