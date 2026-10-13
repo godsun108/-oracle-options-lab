@@ -3,9 +3,22 @@
 This module schedules research candidates. It never consumes realized P&L.
 """
 from __future__ import annotations
-import itertools, json
+import itertools, json, math
 import numpy as np
 from oracle_q.qubo import utility
+
+def validate(candidates,batch_size):
+    n=len(candidates)
+    if isinstance(batch_size,bool) or not isinstance(batch_size,int) or not 0<=batch_size<=n:
+        raise ValueError("invalid research batch size")
+    ids=[c.get("id") for c in candidates]
+    if any(not isinstance(i,str) or not i for i in ids) or len(set(ids))!=n:
+        raise ValueError("research candidate IDs must be unique")
+    for c in candidates:
+        for key in ("information_value","complexity"):
+            value=c.get(key)
+            if isinstance(value,bool) or not isinstance(value,(int,float)) or not math.isfinite(value) or value<0:
+                raise ValueError("invalid design metadata: "+key)
 
 def similarity(a,b):
     keys=("option_structure","signal_family","regime","target","contract_features")
@@ -24,7 +37,9 @@ def matrices(candidates):
 def exact_schedule(candidates,batch_size=8,redundancy_lambda=.35,complexity_gamma=.15):
     """Exact fixed-cardinality scheduler for small candidate menus."""
     n=len(candidates)
-    if n>30: raise ValueError("Use annealing/QAOA path for >30 candidates")
+    validate(candidates,batch_size)
+    if math.comb(n,batch_size)>1000000:
+        raise ValueError("exact schedule exceeds one-million-combination budget")
     info,R,complexity=matrices(candidates)
     best=None; best_u=-np.inf
     # enumerate combinations, not 2^n bitstrings
@@ -36,23 +51,39 @@ def exact_schedule(candidates,batch_size=8,redundancy_lambda=.35,complexity_gamm
 
 
 def anneal_schedule(candidates,batch_size=8,redundancy_lambda=.35,complexity_gamma=.15,
-                    steps=25000,seed=108):
+                    steps=25000,seed=108,incremental=False):
     """Deterministic simulated annealing for larger fixed-cardinality menus."""
     rng=np.random.default_rng(seed); n=len(candidates)
+    validate(candidates,batch_size)
+    if isinstance(steps,bool) or not isinstance(steps,int) or steps<0:
+        raise ValueError("invalid annealing step budget")
     info,R,complexity=matrices(candidates)
     def score(idx):
         x=np.zeros(n); x[list(idx)]=1
         return float(info@x-redundancy_lambda*(x@R@x)/2-complexity_gamma*(complexity@x))
     cur=set(rng.choice(n,size=batch_size,replace=False).tolist()); cur_u=score(cur)
     best=set(cur); best_u=cur_u
+    if batch_size in (0,n):
+        return [candidates[i] for i in sorted(best)],best_u
     for k in range(steps):
         inside=int(rng.choice(list(cur))); outside=int(rng.choice([i for i in range(n) if i not in cur]))
-        nxt=set(cur); nxt.remove(inside); nxt.add(outside); nxt_u=score(nxt)
+        nxt=set(cur); nxt.remove(inside); nxt.add(outside)
+        if incremental:
+            # Fixed-cardinality swap delta: only interactions with the other selected
+            # candidates change. Avoid rebuilding x and evaluating the full n*n form.
+            rest=sorted(cur-{inside})
+            delta=(info[outside]-info[inside]
+                   -complexity_gamma*(complexity[outside]-complexity[inside])
+                   -redundancy_lambda*float((R[outside,rest]-R[inside,rest]).sum()))
+            nxt_u=cur_u+delta
+        else:
+            nxt_u=score(nxt)
         temp=max(.002,1.0-k/steps)
         if nxt_u>=cur_u or rng.random()<np.exp((nxt_u-cur_u)/temp):
             cur,cur_u=nxt,nxt_u
             if cur_u>best_u: best,best_u=set(cur),cur_u
-    return [candidates[i] for i in sorted(best)],best_u
+    # Recompute the reported objective to remove accumulated floating-point drift.
+    return [candidates[i] for i in sorted(best)],score(best)
 
 def qubo_for_scheduler(candidates,redundancy_lambda=.35,complexity_gamma=.15):
     info,R,complexity=matrices(candidates)

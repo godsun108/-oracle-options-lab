@@ -21,12 +21,36 @@ def _fit_logit(X,y,l2=1.0,steps=30):
         b-=np.linalg.solve(h,g)
     return b
 
+def available_training_rows(df, decision_time, date_col="date",
+                            label_available_col="exit_date"):
+    """Purge same-time signals and labels not known strictly before a decision.
+
+    Date-only exit inputs are conservatively excluded for the entire exit date.
+    This checks label chronology, not feature publication/vintage provenance.
+    """
+    if label_available_col not in df:
+        raise ValueError("label availability column required: " + label_available_col)
+    decisions = pd.to_datetime(df[date_col], utc=True, errors="raise")
+    available = pd.to_datetime(df[label_available_col], utc=True, errors="raise")
+    cutoff = pd.to_datetime(decision_time, utc=True, errors="raise")
+    if decisions.isna().any() or available.isna().any() or pd.isna(cutoff):
+        raise ValueError("missing training chronology")
+    if (available < decisions).any():
+        raise ValueError("label availability precedes signal")
+    # Midnight dates carry no intraday publication evidence: wait through that
+    # calendar date instead of treating them as known at its opening midnight.
+    midnight = available == available.dt.normalize()
+    available = available.where(~midnight, available + pd.Timedelta(days=1) - pd.Timedelta(nanoseconds=1))
+    return df.loc[(decisions < cutoff) & (available < cutoff)].copy()
+
+
 def walk_forward_predict(df, feature_cols, target_col, date_col="date",
-                         min_train=100,l2=1.0):
+                         min_train=100,l2=1.0,label_available_col="exit_date"):
     d=df.sort_values(date_col).copy()
     out=[]
     for i in range(len(d)):
-        train=d.iloc[:i].dropna(subset=feature_cols+[target_col])
+        train=available_training_rows(d, d.iloc[i][date_col], date_col,
+                                      label_available_col).dropna(subset=feature_cols+[target_col])
         row=d.iloc[[i]].dropna(subset=feature_cols)
         if len(train)<min_train or row.empty:
             continue
@@ -39,7 +63,7 @@ def walk_forward_predict(df, feature_cols, target_col, date_col="date",
         base=float(y.mean())
         out.append({date_col:row.iloc[0][date_col],"p_model":p,
                     "p_unconditional":base,"n_train":len(train)})
-    return pd.DataFrame(out)
+    return pd.DataFrame(out, columns=[date_col,"p_model","p_unconditional","n_train"])
 
 def brier(y,p):
     y=np.asarray(y,float); p=np.asarray(p,float)
