@@ -256,6 +256,7 @@ def run(registry, token, *, fetch=request_history, now=None, mode="historical"):
                             "orders_enabled":False,"edge_proven":False})
     return {"schema":"oracle-q-edge-lab-v1","status":"FORWARD_INPUT_RESEARCH_ONLY" if mode=="forward" else "HISTORICAL_RESEARCH_ONLY",
             "collection_mode":mode,
+            "blocked_markets":[r["symbol"] for r in reports if r["status"]=="DATA_OR_VALIDATION_FAILURE"],
             "observed_at":datetime.now(timezone.utc).isoformat(),
             "evaluation_cutoff_at":now.isoformat(),
             "calendar_sha256":CALENDAR_SHA256,
@@ -270,12 +271,17 @@ def main():
     p.add_argument("--registry",default="research/edge_registry.json")
     p.add_argument("--output",default="edge_lab_report.json")
     p.add_argument("--mode",choices=("historical","forward"),default="historical")
+    p.add_argument("--allow-partial",action="store_true")
     a=p.parse_args()
     registry=json.loads(Path(a.registry).read_text())
     report=run(registry,os.getenv("TRADIER_TOKEN",""),mode=a.mode)
     Path(a.output).write_text(json.dumps(report,indent=2,sort_keys=True)+"\n")
     print("Edge lab:",[(r["symbol"],r["status"]) for r in report["reports"]])
     expected="FORWARD_OPEN_INPUTS_ONLY" if a.mode=="forward" else "HISTORICAL_OPEN_PROXY_BACKTEST_ONLY"
+    if a.allow_partial and a.mode=="forward" and any(r["status"]==expected for r in report["reports"]):
+        if report["blocked_markets"]:
+            print("::warning::Partial market data; blocked markets: "+", ".join(report["blocked_markets"]))
+        return
     if any(r["status"]!=expected for r in report["reports"]):
         raise SystemExit(1)
 

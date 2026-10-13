@@ -21,3 +21,21 @@ IWM/GLD defects are unresolved, not repaired or declared irrelevant to backtests
 This separates historical experiment availability from the data dependencies of
 prospective signals. It does not certify source authenticity, executable fills or
 profitability. No price substitutions, live orders or new providers are enabled.
+
+## Explicit market isolation
+
+Production opts into `--allow-partial` at collection, replay, ledger, and scorecard
+stages. A `DATA_OR_VALIDATION_FAILURE` blocks that entire market for this run: no
+new signals, price checkpoints, or settlements. Its prior events and pending
+signals remain unchanged. No substitute prices or retroactive signals are added.
+Every other market must pass its full source replay and ledger checks. Missing or
+duplicated markets, unknown failure states, and an all-blocked run still fail.
+Default command behavior remains strict; historical mode cannot opt out of failure.
+
+A successful partial workflow means evidence for the validated subset was safely
+processed, not that all six feeds are healthy. The report, replay, ledger and
+scorecard name blocked markets; Actions emits a warning and its summary labels
+collection health. All 18 pairs remain in the scorecard and Bonferroni family,
+including blocked pairs with no new outcomes. Missing outcomes are not zero
+returns. Availability can bias evidence, so partial coverage is not evidence of
+profitability. A later recovery must still match recorded price checkpoints.
