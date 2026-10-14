@@ -1,4 +1,6 @@
 """Append-only, hash-linked delayed forward paper observations. No broker fills."""
+import copy
+from research.edge_regime_context import validate as validate_regime
 import argparse
 import hashlib
 import json
@@ -147,6 +149,9 @@ def advance(previous,current, *, registered_at=None, allow_partial=False):
                        "calendar_sha256":CALENDAR_SHA256,
                        "source_report_sha256":source_sha,
                        "orders_enabled":False,"fill_verified":False}
+                if "regime_context" in report:
+                    validate_regime(report["regime_context"],key[2])
+                    event["regime_context"]=copy.deepcopy(report["regime_context"])
                 add(event)
                 registered[key]=event
         for key,original in list(registered.items()):
