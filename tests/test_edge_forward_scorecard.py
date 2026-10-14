@@ -5,6 +5,62 @@ from research.edge_forward_scorecard import score,MIN_OUTCOMES_FOR_REVIEW
 from tests.test_edge_forward_paper import report
 
 class ForwardScorecardTests(unittest.TestCase):
+    def test_individual_review_screen_never_approves_live_trading(self):
+        from research.edge_forward_scorecard import candidate_review
+        pair={'current_market_data_status':'VALIDATED','paired_benchmark_observations':60,'outcomes_observed':60}
+        execution={'invested_observations':30,'scenarios':[{
+            'assumed_total_cost_per_side_bps':25,'mean_net_return_pct':0.2,
+            'mean_invested_net_return_pct':0.4,'mean_excess_vs_cost_free_market_pct':0.1}]}
+        result=candidate_review(pair,execution)
+        self.assertEqual(result['status'],'RESEARCH_REVIEW_REQUIRED')
+        self.assertEqual(result['unmet_research_checks'],[])
+        self.assertFalse(result['eligible_for_live_trading'])
+        self.assertFalse(result['edge_proven'])
+        self.assertEqual(result['live_readiness'],'NOT_ASSESSED')
+        pair['paired_benchmark_observations']=59
+        pair['outcomes_observed']=59
+        self.assertEqual(candidate_review(pair,execution)['status'],'ACCUMULATING_FORWARD_EVIDENCE')
+
+    def test_cash_only_losses_missing_and_nonfinite_metrics_do_not_pass(self):
+        from research.edge_forward_scorecard import candidate_review
+        pair={'current_market_data_status':'VALIDATED','paired_benchmark_observations':60,'outcomes_observed':60}
+        for value in (None,0,-0.1,float('nan'),float('inf'),True):
+            execution={'invested_observations':0,'scenarios':[{
+                'assumed_total_cost_per_side_bps':25,'mean_net_return_pct':value,
+                'mean_invested_net_return_pct':value,'mean_excess_vs_cost_free_market_pct':value}]}
+            with self.subTest(value=value):
+                review=candidate_review(pair,execution)
+                self.assertEqual(review['status'],'RESEARCH_SCREEN_NOT_MET')
+                self.assertIn('NO_COMPLETED_INVESTED_OBSERVATIONS',review['unmet_research_checks'])
+                self.assertIn('STRESSED_NET_RETURN_NOT_POSITIVE',review['unmet_research_checks'])
+        self.assertEqual(candidate_review(pair,None)['status'],'RESEARCH_SCREEN_NOT_MET')
+
+    def test_one_market_block_does_not_block_other_candidate_reviews(self):
+        from research.edge_forward_scorecard import candidate_review
+        pair={'current_market_data_status':'VALIDATED','paired_benchmark_observations':60,'outcomes_observed':60}
+        execution={'invested_observations':60,'scenarios':[{
+            'assumed_total_cost_per_side_bps':25,'mean_net_return_pct':1,
+            'mean_invested_net_return_pct':1,'mean_excess_vs_cost_free_market_pct':0.1}]}
+        blocked=dict(pair,current_market_data_status='BLOCKED')
+        self.assertEqual(candidate_review(blocked,execution)['status'],'BLOCKED_MARKET_DATA')
+        self.assertEqual(candidate_review(pair,execution)['status'],'RESEARCH_REVIEW_REQUIRED')
+        incomplete=dict(pair,outcomes_observed=61)
+        self.assertIn('INCOMPLETE_PAIRED_BENCHMARKS',candidate_review(incomplete,execution)['unmet_research_checks'])
+
+    def test_production_review_preserves_full_family_and_pending_evidence(self):
+        from research.edge_forward_scorecard import score_report
+        from tests.test_edge_source_replay import PartialMarketTests
+        source=PartialMarketTests().report()
+        ledger=advance(None,source)
+        before=copy.deepcopy(ledger)
+        result=score_report(ledger,source,as_of='2026-10-12T23:00:00Z')
+        self.assertEqual(len(result['pairs']),18)
+        self.assertEqual(result['candidate_review_policy']['hypothesis_family_size'],18)
+        self.assertTrue(all(p['candidate_review']['status']=='ACCUMULATING_FORWARD_EVIDENCE' for p in result['pairs']))
+        self.assertTrue(all(p['candidate_review']['stressed_metrics']['mean_net_return_pct'] is None for p in result['pairs']))
+        self.assertTrue(all(p['exploratory_uncertainty']['hypothesis_family_size']==18 for p in result['pairs']))
+        self.assertEqual(ledger,before)
+
     def settled_ledger(self):
         first=advance(None,report('2026-10-05',[('2026-10-05',100.0)]))
         return advance(first,report('2026-10-07',[
