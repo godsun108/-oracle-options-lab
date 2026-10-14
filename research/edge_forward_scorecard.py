@@ -18,8 +18,46 @@ from research.edge_lab import IDS
 from research.multi_market_observer import SYMBOLS
 from research.edge_regime_context import validate as validate_regime
 from research.edge_forward_integrity_audit import audit
+from research.edge_execution_sensitivity import summarize as cost_sensitivity
 
 MIN_OUTCOMES_FOR_REVIEW = 60
+REVIEW_COST_PER_SIDE_BPS = 25
+
+def candidate_review(pair, execution):
+    """Fixed descriptive screen for individual research review, never deployment."""
+    reasons=[]
+    if pair['current_market_data_status']!='VALIDATED':
+        reasons.append('CURRENT_MARKET_DATA_BLOCKED')
+    if pair['paired_benchmark_observations']<MIN_OUTCOMES_FOR_REVIEW:
+        reasons.append('INSUFFICIENT_PAIRED_FORWARD_OBSERVATIONS')
+    if pair['paired_benchmark_observations']!=pair['outcomes_observed']:
+        reasons.append('INCOMPLETE_PAIRED_BENCHMARKS')
+    active=execution['invested_observations'] if execution else 0
+    if active==0:
+        reasons.append('NO_COMPLETED_INVESTED_OBSERVATIONS')
+    scenario=next((s for s in execution['scenarios']
+                   if s['assumed_total_cost_per_side_bps']==REVIEW_COST_PER_SIDE_BPS),None) if execution else None
+    for field,reason in (
+        ('mean_net_return_pct','STRESSED_NET_RETURN_NOT_POSITIVE'),
+        ('mean_invested_net_return_pct','STRESSED_INVESTED_RETURN_NOT_POSITIVE'),
+        ('mean_excess_vs_cost_free_market_pct','STRESSED_EXCESS_VS_COST_FREE_MARKET_NOT_POSITIVE')):
+        value=scenario.get(field) if scenario else None
+        if not isinstance(value,(int,float)) or isinstance(value,bool) or not math.isfinite(value) or value<=0:
+            reasons.append(reason)
+    status=('BLOCKED_MARKET_DATA' if 'CURRENT_MARKET_DATA_BLOCKED' in reasons else
+            'ACCUMULATING_FORWARD_EVIDENCE' if 'INSUFFICIENT_PAIRED_FORWARD_OBSERVATIONS' in reasons else
+            'RESEARCH_SCREEN_NOT_MET' if reasons else 'RESEARCH_REVIEW_REQUIRED')
+    return {'status':status,'unmet_research_checks':reasons,
+            'completed_invested_observations':active,
+            'assumed_cost_per_side_bps':REVIEW_COST_PER_SIDE_BPS,
+            'stressed_metrics':scenario,
+            'eligible_for_live_trading':False,'edge_proven':False,
+            'live_readiness':'NOT_ASSESSED',
+            'remaining_review_requirements':[
+                'Independent validation accounting for selection and repeated testing',
+                'Regime robustness and portfolio drawdown assessment',
+                'Measured execution quality and broker reconciliation',
+                'Tested risk controls and explicit capital/loss-budget authorization']}
 
 def _mean(values):
     return round(statistics.fmean(values), 6) if values else None
@@ -216,8 +254,16 @@ def score_report(ledger, report, *, as_of, allow_partial=False):
     result=score(ledger,expected_pairs=expected,as_of=as_of)
     result["blocked_markets"]=blocked
     result["collection_health"]="PARTIAL_MARKET_DATA" if blocked else "ALL_MARKETS_VALIDATED"
+    execution={(p['symbol'],p['strategy_id']):p for p in cost_sensitivity(ledger)['pairs']}
     for pair in result["pairs"]:
         pair["current_market_data_status"]="BLOCKED" if pair["symbol"] in blocked else "VALIDATED"
+        pair['candidate_review']=candidate_review(pair,execution.get((pair['symbol'],pair['strategy_id'])))
+    result['candidate_review_policy']={
+        'version':'individual-research-review-v1',
+        'minimum_paired_observations':MIN_OUTCOMES_FOR_REVIEW,
+        'assumed_cost_per_side_bps':REVIEW_COST_PER_SIDE_BPS,
+        'hypothesis_family_size':len(expected),
+        'warning':'Fixed descriptive triage only, not statistical significance, a trading gate, or profitability certification. One candidate can reach review independently; selecting it does not reduce the hypothesis family. Thresholds are research conventions, not validated deployment criteria.'}
     return result
 
 def main():

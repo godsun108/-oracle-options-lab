@@ -140,6 +140,10 @@ jobs:
                   f.write(f"Collection health: {sc.get('collection_health','UNKNOWN')}; blocked markets: {sc.get('blocked_markets',[])}\n")
                   for pair in sc.get("pairs",[]):
                       f.write(f"- {pair['symbol']} / {pair['strategy_id']}: {pair['outcomes_observed']} settled, {pair['pending']} pending, {pair.get('signals_excluded_timing',0)} excluded for missing timing; status: {pair['status']}\\n")
+                  f.write("\nIndividual candidate review (not live approval):\n")
+                  for pair in sc.get("pairs",[]):
+                      review=pair.get("candidate_review",{})
+                      f.write(f"- {pair['symbol']} / {pair['strategy_id']}: {review.get('status','UNAVAILABLE')}; unmet checks: {', '.join(review.get('unmet_research_checks',[])) or 'none; manual research review required'}\n")
               audit_path=Path("edge_forward_integrity_audit.json")
               if audit_path.exists():
                   integrity=json.loads(audit_path.read_text())
