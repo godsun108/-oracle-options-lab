@@ -5,6 +5,53 @@ from research.edge_forward_scorecard import score,MIN_OUTCOMES_FOR_REVIEW
 from tests.test_edge_forward_paper import report
 
 class ForwardScorecardTests(unittest.TestCase):
+    def test_regime_coverage_uses_registration_labels_and_keeps_unknowns(self):
+        from tests import test_edge_source_replay as fixtures
+        factory=fixtures.PartialMarketTests()
+        first=factory.report()
+        for market in first['reports']:
+            market.pop('regime_context')
+        ledger=advance(None,first)
+        ledger=advance(ledger,factory.report(13))
+        ledger=advance(ledger,factory.report(14))
+        before=copy.deepcopy(ledger)
+        result=score(ledger)
+        self.assertEqual(result['outcomes_total'],18)
+        self.assertEqual(result['distinct_outcome_exit_sessions'],1)
+        for pair in result['pairs']:
+            buckets=pair['regime_coverage']
+            self.assertEqual(len(buckets),5)
+            unknown=next(b for b in buckets if b['regime']=='UNCLASSIFIED')
+            self.assertEqual(unknown['completed_observations'],1)
+            self.assertEqual(unknown['pending'],0)
+            self.assertEqual(sum(b['pending'] for b in buckets),pair['pending'])
+            self.assertEqual(sum(b['completed_observations'] for b in buckets),pair['outcomes_observed'])
+            self.assertTrue(all(b['completed_observations']==0 for b in buckets if b['regime']!='UNCLASSIFIED'))
+        self.assertEqual(ledger,before)
+
+    def test_legacy_exclusions_are_not_regime_evidence(self):
+        from tests.test_edge_forward_integrity_audit import rehash
+        ledger=advance(None,report('2026-10-05',[('2026-10-05',100.0)]))
+        for event in ledger['events']:
+            if event['type']=='SIGNAL_REGISTERED':
+                event.pop('registered_at')
+                event.pop('source_observed_at')
+        rehash(ledger)
+        ledger=advance(ledger,report('2026-10-06',[('2026-10-05',100.0),('2026-10-06',101.0)]))
+        result=score(ledger)
+        self.assertEqual(result['signals_excluded_timing'],2)
+        for pair in result['pairs']:
+            self.assertEqual(sum(b['valid_signals'] for b in pair['regime_coverage']),1)
+            self.assertEqual(sum(b['completed_observations'] for b in pair['regime_coverage']),0)
+
+    def test_invalid_regime_cannot_be_reclassified_as_unknown(self):
+        from tests import test_edge_source_replay as fixtures
+        from tests.test_edge_forward_integrity_audit import rehash
+        ledger=advance(None,fixtures.PartialMarketTests().report())
+        next(e for e in ledger['events'] if e['type']=='SIGNAL_REGISTERED')['regime_context']['label']='WRONG'
+        rehash(ledger)
+        with self.assertRaises(ValueError):score(ledger)
+
     def test_maturity_uses_holiday_and_early_close_calendar(self):
         source=report("2026-11-24",[("2026-11-24",100.0)])
         source["observed_at"]="2026-11-24T22:00:00Z"

@@ -16,11 +16,50 @@ from research.edge_session_calendar import expected_entry_exit, session_bounds, 
 from research.edge_forward_uncertainty import assess
 from research.edge_lab import IDS
 from research.multi_market_observer import SYMBOLS
+from research.edge_regime_context import validate as validate_regime
 
 MIN_OUTCOMES_FOR_REVIEW = 60
 
 def _mean(values):
     return round(statistics.fmean(values), 6) if values else None
+
+def regime_coverage(events, pair):
+    """Coverage only, from original registration context; no hindsight labels."""
+    labels = [direction+'/'+vol for direction in ('UP_OR_FLAT','DOWN')
+              for vol in ('LOW_VOL','HIGH_VOL')] + ['UNCLASSIFIED']
+    buckets = {label: {'regime':label, 'valid_signals':0, 'completed_observations':0,
+                       'pending':0} for label in labels}
+    signals = {}
+    excluded = set()
+    outcomes = set()
+    for event in events:
+        if (event.get('symbol'),event.get('strategy_id')) != pair:
+            continue
+        day = event['signal_date']
+        kind = event['type']
+        if kind == 'SIGNAL_REGISTERED':
+            if day in signals:
+                raise ValueError('duplicate regime registration')
+            signals[day] = event
+        elif kind == 'SIGNAL_EXCLUDED_TIMING':
+            excluded.add(day)
+        elif kind == 'PAPER_OUTCOME_OBSERVED':
+            outcomes.add(day)
+    for day,event in signals.items():
+        if day in excluded or 'registered_at' not in event:
+            continue
+        label = 'UNCLASSIFIED'
+        if 'regime_context' in event:
+            validate_regime(event['regime_context'],day)
+            label = event['regime_context']['label']
+        bucket = buckets[label]
+        bucket['valid_signals'] += 1
+        bucket['completed_observations'] += int(day in outcomes)
+        bucket['pending'] += int(day not in outcomes)
+    for bucket in buckets.values():
+        bucket['status'] = ('DESCRIPTIVE_COVERAGE_ONLY' if bucket['completed_observations']
+                            else 'NO_COMPLETED_FORWARD_EVIDENCE')
+    return list(buckets.values())
 
 def pending_schedule(events, as_of):
     """Describe maturity, never infer prices, fills, or completed outcomes."""
@@ -115,6 +154,7 @@ def score(ledger, *, expected_pairs=None, as_of=None):
             "signals_excluded_timing":exclusions[(symbol,strategy_id)],
             "pending":signals[(symbol,strategy_id)]-n-exclusions[(symbol,strategy_id)],
             "paired_benchmark_observations":paired,
+            "regime_coverage":regime_coverage(events,(symbol,strategy_id)),
             "mean_hypothetical_return_pct":_mean(returns),
             "median_hypothetical_return_pct":round(statistics.median(returns),6) if n else None,
             "positive_observations":sum(v>0 for v in returns),
@@ -131,10 +171,13 @@ def score(ledger, *, expected_pairs=None, as_of=None):
         "status":"FORWARD_PAPER_RESEARCH_ONLY",
         "minimum_outcomes_for_review":MIN_OUTCOMES_FOR_REVIEW,
         "outcomes_total":sum(row["outcomes_observed"] for row in results),
+        "distinct_outcome_exit_sessions":len({e['exit_date'] for e in events if e['type']=='PAPER_OUTCOME_OBSERVED'}),
         "signals_excluded_timing":sum(row["signals_excluded_timing"] for row in results),
         "pairs":results, "orders_enabled":False, "fill_verified":False,
         "edge_proven":False, "eligible_for_live_trading":False,
         "limitations":[
+            "Regime buckets report coverage only, not profitability or significance; older labels are never inferred. Regime-specific inference needs its own multiple-testing plan.",
+            "Outcomes across markets and strategies can share the same session and are not independent samples. Distinct sessions are not an effective sample size estimate.",
             "Descriptive hypothetical open-to-open observations are not executable fills.",
             "60 observations permits manual review only; it does not establish statistical significance.",
             "An exploratory Bonferroni-adjusted block bootstrap is computed only after 60 paired outcomes; it does not eliminate correlated strategies, regime changes or repeated testing.",
@@ -188,6 +231,8 @@ def main():
         states[item["status"]]+=1
     print("Forward maturity:",json.dumps(dict(states),sort_keys=True))
     print("Collection health:",result["collection_health"],"blocked:",result["blocked_markets"])
+    classified=sum(b['completed_observations'] for p in result['pairs'] for b in p['regime_coverage'] if b['regime']!='UNCLASSIFIED')
+    print("Regime coverage:",classified,"classified outcomes; distinct exit sessions:",result['distinct_outcome_exit_sessions'],"; no regime profitability established")
 
 if __name__=="__main__":
     main()
