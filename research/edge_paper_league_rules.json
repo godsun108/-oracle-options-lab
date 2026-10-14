@@ -1,0 +1,30 @@
+{
+  "schema": "oracle-q-paper-league-rules-v1",
+  "season_id": "etf-open-paper-2026-10-v1",
+  "registered_at": "2026-10-14T19:29:09.869109+00:00",
+  "first_signal_session": "2026-10-15",
+  "first_entry_session": "2026-10-16",
+  "sessions": 60,
+  "teams": [
+    "SPY",
+    "QQQ",
+    "IWM",
+    "SMH",
+    "TLT",
+    "GLD"
+  ],
+  "strategies": [
+    "tsmom_63",
+    "trend_200",
+    "reversal_5"
+  ],
+  "capital_per_team_usd": 10000,
+  "cost_per_side_bps": 25,
+  "allocation": "equal_weight_three_sleeves_daily",
+  "source_sha256": {
+    "research/edge_lab.py": "b9d5c1b173094ed2832449b044e3a9e116f262f0487b632d4042287d0c24f71d",
+    "research/edge_forward_paper.py": "aa62108f243d46de2e68d6b05756b16ff0940c3f0d2859ae6af87f22179967ad",
+    "research/edge_session_calendar.json": "5f778a102f06e505f1bcbe686d22225dbbbd3d692c1835199e7c20137c40d291"
+  },
+  "orders_enabled": false
+}
