@@ -17,6 +17,7 @@ from research.edge_forward_uncertainty import assess
 from research.edge_lab import IDS
 from research.multi_market_observer import SYMBOLS
 from research.edge_regime_context import validate as validate_regime
+from research.edge_forward_integrity_audit import audit
 
 MIN_OUTCOMES_FOR_REVIEW = 60
 
@@ -96,6 +97,9 @@ def pending_schedule(events, as_of):
 
 
 def score(ledger, *, expected_pairs=None, as_of=None):
+    # A valid hash chain alone does not prove registration timing or return math.
+    # Enforce the same semantic audit for direct callers as for production CLI.
+    integrity = audit(ledger)
     events = verify(ledger)
     groups = defaultdict(list)
     signals = defaultdict(int)
@@ -169,6 +173,8 @@ def score(ledger, *, expected_pairs=None, as_of=None):
     result = {
         "schema":"oracle-q-edge-forward-scorecard-v1",
         "status":"FORWARD_PAPER_RESEARCH_ONLY",
+        "ledger_head_sha256":ledger["head_sha256"],
+        "integrity_audit":integrity,
         "minimum_outcomes_for_review":MIN_OUTCOMES_FOR_REVIEW,
         "outcomes_total":sum(row["outcomes_observed"] for row in results),
         "distinct_outcome_exit_sessions":len({e['exit_date'] for e in events if e['type']=='PAPER_OUTCOME_OBSERVED'}),

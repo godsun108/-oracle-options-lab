@@ -5,6 +5,54 @@ from research.edge_forward_scorecard import score,MIN_OUTCOMES_FOR_REVIEW
 from tests.test_edge_forward_paper import report
 
 class ForwardScorecardTests(unittest.TestCase):
+    def settled_ledger(self):
+        first=advance(None,report('2026-10-05',[('2026-10-05',100.0)]))
+        return advance(first,report('2026-10-07',[
+            ('2026-10-05',100.0),('2026-10-06',101.0),('2026-10-07',103.0)]))
+
+    def test_rehashed_consistent_but_fabricated_profits_rejected(self):
+        from tests.test_edge_forward_integrity_audit import rehash
+        ledger=self.settled_ledger()
+        outcome=next(e for e in ledger['events'] if e['type']=='PAPER_OUTCOME_OBSERVED')
+        # Preserve the old scorecard's benchmark equation while falsifying profit.
+        outcome['hypothetical_net_return_pct']+=10
+        outcome['hypothetical_excess_vs_buy_hold_pct']+=10
+        rehash(ledger)
+        with self.assertRaisesRegex(ValueError,'arithmetic mismatch'):
+            score(ledger)
+
+    def test_rehashed_backdated_entry_rejected_by_direct_score(self):
+        from tests.test_edge_forward_integrity_audit import rehash
+        ledger=self.settled_ledger()
+        signal=next(e for e in ledger['events'] if e['type']=='SIGNAL_REGISTERED')
+        signal['registered_at']='2026-10-06T14:00:00Z'
+        rehash(ledger)
+        with self.assertRaisesRegex(ValueError,'retroactive'):
+            score(ledger)
+
+    def test_rehashed_fill_claim_and_false_counts_rejected(self):
+        from tests.test_edge_forward_integrity_audit import rehash
+        ledger=self.settled_ledger()
+        ledger['events'][0]['fill_verified']=True
+        rehash(ledger)
+        with self.assertRaisesRegex(ValueError,'real order or fill'):
+            score(ledger)
+        ledger=self.settled_ledger()
+        ledger['pending_signals']+=1
+        with self.assertRaisesRegex(ValueError,'pending count mismatch'):
+            score(ledger)
+
+    def test_score_binds_audit_to_ledger_without_promoting_trading(self):
+        ledger=self.settled_ledger()
+        before=copy.deepcopy(ledger)
+        result=score(ledger)
+        self.assertEqual(result['ledger_head_sha256'],ledger['head_sha256'])
+        self.assertEqual(result['integrity_audit']['forward_outcomes'],result['outcomes_total'])
+        self.assertEqual(result['integrity_audit']['status'],'FORWARD_LEDGER_SEMANTICS_VERIFIED')
+        self.assertFalse(result['eligible_for_live_trading'])
+        self.assertFalse(result['edge_proven'])
+        self.assertEqual(before,ledger)
+
     def test_regime_coverage_uses_registration_labels_and_keeps_unknowns(self):
         from tests import test_edge_source_replay as fixtures
         factory=fixtures.PartialMarketTests()
@@ -119,7 +167,7 @@ class ForwardScorecardTests(unittest.TestCase):
         from research.edge_forward_paper import digest
         changed["events"][-1]["event_sha256"]=digest({k:v for k,v in changed["events"][-1].items() if k!="event_sha256"})
         changed["head_sha256"]=changed["events"][-1]["event_sha256"]
-        with self.assertRaisesRegex(ValueError,"benchmark excess mismatch"):
+        with self.assertRaisesRegex(ValueError,"arithmetic mismatch"):
             score(changed)
 
     def test_review_threshold_never_proves_edge(self):
