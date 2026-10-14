@@ -1,4 +1,5 @@
 """Read-only, pre-registered multi-market ETF proxy backtests; no orders or fills."""
+from research.edge_regime_context import describe as describe_regime
 import argparse
 import hashlib
 import json
@@ -40,6 +41,7 @@ def evaluate_forward(symbol, raw, registry, *, now=None):
     return {"symbol":symbol,"status":"FORWARD_OPEN_INPUTS_ONLY",
             "bars":len(bars),"first_date":start,"last_completed_date":bars[-1]["time"],
             "price_field":"open_only","recent_opens":bars[-25:],
+            "regime_context":describe_regime(bars),
             "open_series_sha256":hashlib.sha256(json.dumps(bars,sort_keys=True,separators=(",",":")).encode()).hexdigest(),
             "strategies":[{"strategy_id":sid,"next_session_paper_signal":signal(sid,[b["open"] for b in bars]),
                            "next_session_fill_verified":False,"edge_proven":False} for sid in IDS],

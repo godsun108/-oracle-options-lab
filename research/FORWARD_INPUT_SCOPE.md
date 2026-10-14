@@ -39,3 +39,23 @@ collection health. All 18 pairs remain in the scorecard and Bonferroni family,
 including blocked pairs with no new outcomes. Missing outcomes are not zero
 returns. Availability can bias evidence, so partial coverage is not evidence of
 profitability. A later recovery must still match recorded price checkpoints.
+
+## Prospective descriptive regimes
+
+`open-trend63-vol20-v1` records 63-session opening-price momentum and the
+sample standard deviation of the latest 20 opening log returns, annualized by
+sqrt(252). Nonnegative momentum is UP_OR_FLAT; negative is DOWN. Volatility
+at or above 20 percent is HIGH_VOL, otherwise LOW_VOL. This fixed, exploratory
+threshold is not fitted, economically universal, or asserted optimal. These
+are price descriptors, not recession labels, forecasts, or trading filters.
+
+The source replay recomputes the metrics from the retained price window. New
+signals include the context and its window hash inside their hash-linked event.
+Existing signals are never backfilled, and unchanged same-session reruns do not
+rewrite labels. Earlier signals therefore remain unclassified. Partial-market
+failures still block all new registrations for those markets.
+
+Regime classification does not create new strategies or change the 18-hypothesis
+family. No regime-level significance or profitability is estimated. Any future
+regime-specific selection or inferential testing requires an explicitly expanded
+testing plan; pooled observations are not proof of performance in every regime.

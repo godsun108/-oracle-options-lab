@@ -3,6 +3,7 @@
 Rejects backdated entries, price revisions hidden in outcomes, unsupported fills,
 unregistered signals and arithmetic inconsistencies. Never asserts alpha.
 """
+from research.edge_regime_context import validate as validate_regime
 import argparse
 import json
 import math
@@ -55,6 +56,10 @@ def audit(ledger):
                 raise ValueError("duplicate or invalid paper signal")
             if "registered_at" in event:
                 parse_utc_timestamp(event["registered_at"])
+            if "regime_context" in event:
+                if "registered_at" not in event:
+                    raise ValueError("regime lacks prospective registration")
+                validate_regime(event["regime_context"], event["signal_date"])
             registered[key] = event
         elif kind == "SIGNAL_EXCLUDED_TIMING":
             key = (event["symbol"], event["strategy_id"], event["signal_date"])
