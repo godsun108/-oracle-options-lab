@@ -40,6 +40,49 @@ def verify(state):
         prior = event["event_sha256"]
     if state["head_sha256"] != prior:
         raise ValueError("paper portfolio head mismatch")
+    # A valid hash chain alone does not prove that reported balances agree
+    # with the events. Recompute every trade without trusting saved balances.
+    cash = state["starting_cash"]
+    if type(cash) not in (int, float) or not math.isfinite(cash) or cash <= 0:
+        raise ValueError("invalid initial capital")
+    cash = float(cash)
+    qty = 0.0
+    entry = None
+    realized = 0.0
+    mark = None
+    for event in state["events"]:
+        target = event["target"]
+        price = event["price"]
+        bps = event["cost_bps"]
+        if type(target) is not int or target not in (0, 1):
+            raise ValueError("invalid event target")
+        if type(price) not in (int, float) or not math.isfinite(price) or price <= 0:
+            raise ValueError("invalid event price")
+        if type(bps) not in (int, float) or not math.isfinite(bps) or not 0 <= bps < 10000:
+            raise ValueError("invalid event cost")
+        fee = bps / 10000
+        action = "HOLD"
+        if target == 1 and qty == 0:
+            qty = cash / (price * (1 + fee))
+            cash -= qty * price * (1 + fee)
+            entry = price * (1 + fee)
+            action = "SIMULATED_BUY"
+        elif target == 0 and qty > 0:
+            proceeds = qty * price * (1 - fee)
+            cash += proceeds
+            realized += proceeds - qty * entry
+            qty = 0.0
+            entry = None
+            action = "SIMULATED_SELL"
+        if event["action"] != action or not math.isclose(event["quantity_after"], qty, abs_tol=1e-8) or not math.isclose(event["cash_after"], cash, abs_tol=1e-8):
+            raise ValueError("event accounting mismatch")
+        mark = {"price": float(price), "observed_at": event["observed_at"]}
+    for key, computed in (("cash", cash), ("quantity", qty), ("realized_pnl", realized)):
+        reported = state[key]
+        if type(reported) not in (int, float) or not math.isfinite(reported) or not math.isclose(reported, computed, abs_tol=1e-8):
+            raise ValueError("portfolio balance mismatch: " + key)
+    if state["average_entry"] != entry or state["last_mark"] != mark:
+        raise ValueError("portfolio mark or entry mismatch")
     return True
 
 
