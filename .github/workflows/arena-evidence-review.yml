@@ -1,0 +1,33 @@
+name: Oracle-Q Arena Evidence Review
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  evidence-review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install research dependencies
+        run: python -m pip install pytest numpy pandas requests scikit-learn
+      - name: Verify frozen-league adapter
+        run: python -m pytest -q tests/test_arena_frozen_league.py tests/test_edge_paper_league.py
+      - name: Export only when a prospective ledger exists
+        run: |
+          if test -f out/edge-forward-ledger.json; then
+            python -m research.export_arena_frozen_league --ledger out/edge-forward-ledger.json
+          else
+            mkdir -p out
+            printf '%s\n' '{"schema":"oracle-q-arena-review-status-v1","status":"NO_LEDGER_AVAILABLE","published":false,"orders_enabled":false,"warning":"No prospective ledger was available in this isolated run. No scores generated."}' > out/arena-review-status.json
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: oracle-q-arena-evidence-review
+          path: |
+            out/arena-frozen-league-review.json
+            out/arena-review-status.json
+          if-no-files-found: error
+          retention-days: 30
