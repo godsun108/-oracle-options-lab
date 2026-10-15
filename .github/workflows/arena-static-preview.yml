@@ -1,0 +1,39 @@
+name: Oracle-Q Arena Static Preview
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'arena/**'
+      - '.github/workflows/arena-static-preview.yml'
+permissions:
+  contents: read
+jobs:
+  validate-and-package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate static Arena assets
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          page=Path("arena/index.html").read_text()
+          assert "<title>Oracle-Q Arena" in page
+          assert "NO VERIFIED LIVE FEED" in page
+          assert "arena-feed.json" in page
+          assert not Path("arena/arena-feed.json").exists(), "No unaudited feed may ship in preview"
+          print("Static Arena preview verified: no results shipped")
+          PY
+      - name: Package mobile preview
+        run: |
+          mkdir -p dist/arena
+          cp arena/index.html dist/arena/index.html
+          cp arena/README.md dist/arena/README.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: oracle-q-arena-static-preview
+          path: dist/arena
+          if-no-files-found: error
+          retention-days: 7
