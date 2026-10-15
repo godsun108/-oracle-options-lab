@@ -6,8 +6,11 @@ on:
       - 'arena/**'
       - '.github/workflows/arena-pages.yml'
   workflow_dispatch:
+  schedule:
+    - cron: '10 1 * * 2-6'
 permissions:
   contents: read
+  actions: read
   pages: write
   id-token: write
 concurrency:
@@ -23,27 +26,59 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
-      - name: Validate publication boundaries
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Obtain most recent reviewed production snapshot
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
+          mkdir -p out/arena-review
+          RUN_ID=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow arena-evidence-review.yml --branch main --limit 30 --json databaseId,event,conclusion,status --jq '[.[] | select(.event == "schedule" or .event == "workflow_dispatch")][0].databaseId // empty')
+          if [ -z "$RUN_ID" ]; then
+            echo "No review run yet; publish explicit empty research status"
+            exit 0
+          fi
+          export RUN_ID
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID" > out/arena-review/source-run.json
           python - <<'PY'
+          import json,os
+          from pathlib import Path
+          r=json.loads(Path("out/arena-review/source-run.json").read_text())
+          assert r["id"] == int(os.environ["RUN_ID"])
+          assert r["path"] == ".github/workflows/arena-evidence-review.yml"
+          assert r["head_branch"] == "main"
+          assert r["event"] in ("schedule","workflow_dispatch")
+          assert r["status"] == "completed" and r["conclusion"] == "success"
+          PY
+          gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" --name oracle-q-arena-evidence-review --dir out/arena-review
+      - name: Project audited progress, or retain empty feed
+        run: |
+          if test -s out/arena-review/arena-frozen-league-review.json; then
+            python -m research.arena_public_progress --review out/arena-review/arena-frozen-league-review.json --output out/arena-feed.json
+          else
+            cp arena/arena-feed.json out/arena-feed.json
+          fi
+          python - <<'PY'
+          import json
           from pathlib import Path
           page=Path("arena/index.html").read_text()
-          assert "NO VERIFIED LIVE FEED" in page
-          assert "arena-feed.json" in page
-          import json
-          feed=json.loads(Path("arena/arena-feed.json").read_text())
+          feed=json.loads(Path("out/arena-feed.json").read_text())
+          assert "NO VERIFIED LIVE FEED" in page and "arena-feed.json" in page
           assert feed["schema"] == "oracle-q-arena-feed-v1"
-          assert feed["rows"] == [] and feed["live"] is False
-          assert feed["orders_enabled"] is False and feed["edge_proven"] is False
-          assert feed["source_kind"] == "NO_VERIFIED_SCORECARD"
-          print("Arena static page verified: no competition results published")
+          assert feed["live"] is False and feed["orders_enabled"] is False and feed["edge_proven"] is False
+          if feed["source_kind"] == "NO_VERIFIED_SCORECARD":
+              assert feed["rows"] == []
+          else:
+              assert feed["source_kind"] == "AUDITED_FROZEN_PAPER_LEAGUE"
+              assert len(feed["rows"]) == 6
           PY
       - name: Prepare Pages site
         run: |
           mkdir -p _site
           mkdir -p _site/arena
           cp arena/index.html _site/arena/index.html
-          cp arena/arena-feed.json _site/arena/arena-feed.json
+          cp out/arena-feed.json _site/arena/arena-feed.json
           printf '<!doctype html><meta http-equiv="refresh" content="0; url=./arena/"><a href="./arena/">Oracle-Q Arena</a>\n' > _site/index.html
           printf 'Oracle-Q Arena is a research-only spectator preview. No verified live trading feed is connected.\n' > _site/arena/STATUS.txt
       - uses: actions/upload-pages-artifact@v3
