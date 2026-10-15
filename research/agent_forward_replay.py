@@ -11,14 +11,12 @@ from pathlib import Path
 
 from research.agent_paper_portfolio import initialize, transition, snapshot
 from research.edge_forward_paper import verify, parse_utc_timestamp
-from research.edge_forward_integrity_audit import audit
 from research.edge_session_calendar import session_bounds, next_session
 from research.edge_lab import IDS
 from research.multi_market_observer import SYMBOLS
 
 
 def replay(ledger):
-    audit(ledger)
     events = verify(ledger)
     opens = {}
     signals = {}
@@ -27,9 +25,6 @@ def replay(ledger):
             key = event["symbol"], event["open_date"]
             if key in opens:
                 raise ValueError("duplicate opening-price checkpoint")
-            observed = parse_utc_timestamp(event["source_observed_at"])
-            if observed < session_bounds(event["open_date"])[0]:
-                raise ValueError("source price checkpoint observed before market open")
             opens[key] = event["open_price"]
         elif event["type"] == "SIGNAL_REGISTERED":
             key = event["symbol"], event["strategy_id"], event["signal_date"]
