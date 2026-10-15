@@ -1,6 +1,8 @@
 name: Oracle-Q Arena Evidence Review
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '10 0 * * 2-6'
   pull_request:
     paths:
       - 'research/arena_frozen_league.py'
