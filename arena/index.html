@@ -15,9 +15,9 @@
 </main><script>
 const tbody=document.getElementById('rows'),message=document.getElementById('message');
 async function refresh(){try{const response=await fetch('./arena-feed.json',{cache:'no-store'});if(!response.ok)throw Error('Feed unavailable');const feed=await response.json();if(feed.schema!=='oracle-q-arena-feed-v1'||!Array.isArray(feed.rows))throw Error('Unrecognized feed');
-const rows=feed.rows.filter(x=>x&&x.status==='COMPLETE_DESCRIPTIVE'&&typeof x.market==='string'&&typeof x.candidate_id==='string'&&Number.isFinite(x.net_return_pct)&&Number.isFinite(x.max_drawdown_pct));
-tbody.replaceChildren();if(!rows.length){tbody.innerHTML='<tr><td colspan="5">No verified results published</td></tr>';}else{for(const r of rows){const tr=document.createElement('tr');for(const value of [r.market,r.candidate_id,r.status,r.net_return_pct.toFixed(2)+'%',r.max_drawdown_pct.toFixed(2)+'%']){const td=document.createElement('td');td.textContent=value;tr.append(td)}tbody.append(tr)}}
-document.getElementById('status').textContent='SNAPSHOT • NOT LIVE';message.textContent='Snapshot loaded. Feed timestamps and audit status must be independently verified before labeling results live.';document.getElementById('matches').textContent='Not verified';document.getElementById('error').textContent='';
+const rows=feed.rows.filter(x=>x&&typeof x.market==='string'&&typeof x.candidate_id==='string'&&typeof x.status==='string');
+tbody.replaceChildren();if(!rows.length){tbody.innerHTML='<tr><td colspan="5">No verified results published</td></tr>';}else{for(const r of rows){const tr=document.createElement('tr');for(const value of [r.market,r.candidate_id,r.status,Number.isFinite(r.net_return_pct)?r.net_return_pct.toFixed(2)+'%':'—',Number.isFinite(r.max_drawdown_pct)?r.max_drawdown_pct.toFixed(2)+'%':'—']){const td=document.createElement('td');td.textContent=value;tr.append(td)}tbody.append(tr)}}
+document.getElementById('status').textContent='SNAPSHOT • NOT LIVE';message.textContent='Snapshot generated '+String(feed.generated_at||'unknown')+'. Research only; independently verify evidence before interpreting results.';document.getElementById('matches').textContent='Not verified';document.getElementById('error').textContent='';
 }catch(e){document.getElementById('status').textContent='NO VERIFIED LIVE FEED';document.getElementById('error').textContent='No audited feed available yet. This arena is a preview, not a live competition.'}}
 document.getElementById('refresh').addEventListener('click',refresh);refresh();
 </script></body></html>
