@@ -34,7 +34,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p out/arena-review
-          RUN_ID=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow arena-evidence-review.yml --branch main --limit 30 --json databaseId,event,conclusion,status --jq '[.[] | select(.event == "schedule" or .event == "workflow_dispatch")][0].databaseId // empty')
+          RUN_ID=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow arena-evidence-review.yml --branch main --status success --limit 30 --json databaseId,event,conclusion,status --jq '[.[] | select(.event == "schedule" or .event == "workflow_dispatch")][0].databaseId // empty')
           if [ -z "$RUN_ID" ]; then
             echo "No review run yet; publish explicit empty research status"
             exit 0
