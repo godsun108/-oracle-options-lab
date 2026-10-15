@@ -33,6 +33,8 @@ on:
       - 'research/league_session_adapter.py'
       - 'research/league_provisional_standings.py'
       - 'research/league_readiness_report.py'
+      - 'research/forward_profit_triage.py'
+      - 'tests/test_forward_profit_triage.py'
       - 'tests/test_league_provisional_standings.py'
       - 'tests/test_league_readiness_report.py'
       - 'tests/test_league_session_adapter.py'
@@ -82,6 +84,8 @@ on:
       - "tests/test_edge_history_diagnostic.py"
       - "research/edge_forward_paper.py"
       - "research/edge_forward_scorecard.py"
+      - "research/forward_profit_triage.py"
+      - "tests/test_forward_profit_triage.py"
       - "research/edge_forward_uncertainty.py"
       - "tests/test_edge_forward_uncertainty.py"
       - "research/edge_forward_integrity_audit.py"
@@ -115,7 +119,7 @@ jobs:
           python-version: "3.11"
       - name: Verify pre-registered edge lab research
         # Diagnostic probes are tested without network access or credentials.
-        run: python -m unittest tests.test_edge_paper_league tests.test_edge_regime_context tests.test_edge_history_diagnostic tests.test_edge_source_replay tests.test_edge_lab tests.test_edge_forward_paper tests.test_edge_forward_scorecard tests.test_edge_forward_integrity_audit tests.test_edge_forward_uncertainty tests.test_edge_evidence_restore tests.test_edge_session_calendar tests.test_edge_execution_sensitivity tests.test_agent_paper_portfolio tests.test_agent_forward_replay tests.test_league_championships tests.test_league_fixtures tests.test_league_scoring tests.test_league_session_adapter tests.test_league_provisional_standings tests.test_league_readiness_report -v
+        run: python -m unittest tests.test_edge_paper_league tests.test_edge_regime_context tests.test_edge_history_diagnostic tests.test_edge_source_replay tests.test_edge_lab tests.test_edge_forward_paper tests.test_edge_forward_scorecard tests.test_edge_forward_integrity_audit tests.test_edge_forward_uncertainty tests.test_edge_evidence_restore tests.test_edge_session_calendar tests.test_edge_execution_sensitivity tests.test_agent_paper_portfolio tests.test_agent_forward_replay tests.test_league_championships tests.test_league_fixtures tests.test_league_scoring tests.test_league_session_adapter tests.test_league_provisional_standings tests.test_league_readiness_report tests.test_forward_profit_triage -v
 
   research:
     if: github.event_name != 'pull_request'
@@ -151,6 +155,8 @@ jobs:
         run: python -m research.edge_evidence_restore --prior edge-restore/edge_forward_ledger.json --current edge_forward_ledger.json --output edge_forward_continuity.json
       - name: Score paired delayed forward paper outcomes
         run: python -m research.edge_forward_scorecard --ledger edge_forward_ledger.json --report edge_lab_report.json --output edge_forward_scorecard.json --allow-partial
+      - name: Triage observed net-positive forward paper candidates
+        run: python -m research.forward_profit_triage --scorecard edge_forward_scorecard.json --output forward_profit_triage.json
       - name: Stress fixed hypothetical execution costs
         run: python -m research.edge_execution_sensitivity --ledger edge_forward_ledger.json --output edge_execution_sensitivity.json
       - name: Score fixed prospective paper league
@@ -216,6 +222,7 @@ jobs:
             edge_paper_league.json
             agent_paper_positions.json
             league_readiness_report.json
+            forward_profit_triage.json
             research/edge_paper_league_rules.json
             edge_forward_continuity.json
             edge-restore/edge_restore_manifest.json
