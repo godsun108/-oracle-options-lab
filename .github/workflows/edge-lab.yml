@@ -30,6 +30,8 @@ on:
       - 'research/league_championships.py'
       - 'research/league_fixtures.py'
       - 'research/league_scoring.py'
+      - 'research/league_session_adapter.py'
+      - 'tests/test_league_session_adapter.py'
       - 'tests/test_league_scoring.py'
       - 'tests/test_league_fixtures.py'
       - 'tests/test_league_championships.py'
@@ -50,6 +52,8 @@ on:
       - "research/league_championships.py"
       - "research/league_fixtures.py"
       - "research/league_scoring.py"
+      - "research/league_session_adapter.py"
+      - "tests/test_league_session_adapter.py"
       - "tests/test_league_scoring.py"
       - "tests/test_league_fixtures.py"
       - "tests/test_league_championships.py"
@@ -105,7 +109,7 @@ jobs:
           python-version: "3.11"
       - name: Verify pre-registered edge lab research
         # Diagnostic probes are tested without network access or credentials.
-        run: python -m unittest tests.test_edge_paper_league tests.test_edge_regime_context tests.test_edge_history_diagnostic tests.test_edge_source_replay tests.test_edge_lab tests.test_edge_forward_paper tests.test_edge_forward_scorecard tests.test_edge_forward_integrity_audit tests.test_edge_forward_uncertainty tests.test_edge_evidence_restore tests.test_edge_session_calendar tests.test_edge_execution_sensitivity tests.test_agent_paper_portfolio tests.test_agent_forward_replay tests.test_league_championships tests.test_league_fixtures tests.test_league_scoring -v
+        run: python -m unittest tests.test_edge_paper_league tests.test_edge_regime_context tests.test_edge_history_diagnostic tests.test_edge_source_replay tests.test_edge_lab tests.test_edge_forward_paper tests.test_edge_forward_scorecard tests.test_edge_forward_integrity_audit tests.test_edge_forward_uncertainty tests.test_edge_evidence_restore tests.test_edge_session_calendar tests.test_edge_execution_sensitivity tests.test_agent_paper_portfolio tests.test_agent_forward_replay tests.test_league_championships tests.test_league_fixtures tests.test_league_scoring tests.test_league_session_adapter -v
 
   research:
     if: github.event_name != 'pull_request'
