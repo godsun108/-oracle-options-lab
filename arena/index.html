@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Oracle-Q Arena | Research Competition</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,-apple-system,sans-serif;background:#090e19;color:#f3f6ff}body{margin:0}main{max-width:1050px;margin:auto;padding:24px}header{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}.tag{border:1px solid #50627d;border-radius:20px;padding:7px 12px;color:#bfd0ec;font-size:12px}h1{font-size:clamp(30px,6vw,52px);margin:25px 0 4px}.sub{color:#a6b8d2}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin:24px 0}.card{border:1px solid #26354e;background:#121b2d;border-radius:16px;padding:18px}.card h2{font-size:17px;margin:0 0 12px}.big{font-size:25px;font-weight:750}.muted{color:#a6b8d2;font-size:13px}.pill{display:inline-block;padding:5px 9px;border-radius:10px;background:#27334a;color:#d4e4ff;font-size:12px}table{border-collapse:collapse;width:100%}th,td{text-align:left;padding:12px;border-bottom:1px solid #283752}th{color:#a6b8d2;font-size:12px}a{color:#8ec8ff}button{background:#233c5e;color:white;border:1px solid #45648c;border-radius:10px;padding:10px;cursor:pointer}#error{color:#ffbcab}footer{padding:24px 0;color:#a6b8d2;font-size:12px}
+</style></head><body><main><header><strong>◈ ORACLE-Q / ARENA</strong><span class="tag" id="status">NO VERIFIED LIVE FEED</span></header>
+<h1>Competition Arena</h1><p class="sub">Research competition • Evidence before confidence • No real-money orders</p>
+<div class="grid"><section class="card"><h2>Market leagues</h2><div class="big">6</div><p class="muted">SPY · QQQ · IWM · SMH · TLT · GLD</p><span class="pill">Baseline season registered</span></section>
+<section class="card"><h2>Verified active matches</h2><div class="big" id="matches">—</div><p class="muted">No live competition feed connected yet</p></section>
+<section class="card"><h2>Proven edge</h2><div class="big">Not established</div><p class="muted">Research and paper results are not brokerage profits</p></section></div>
+<section class="card"><header><h2>Market leaderboard</h2><button id="refresh" type="button">Refresh feed</button></header>
+<p id="message" class="muted">Waiting for audited competition evidence. Rankings will appear only when complete comparable windows exist.</p>
+<div style="overflow-x:auto"><table><thead><tr><th>Market</th><th>Candidate</th><th>Evidence</th><th>Net return</th><th>Drawdown</th></tr></thead><tbody id="rows"><tr><td colspan="5">No verified results published</td></tr></tbody></table></div></section>
+<p id="error" role="alert"></p><footer>Research-only prototype. A static page is not a live trading service. No results are fabricated. Source: <a href="https://github.com/godsun108/-oracle-options-lab/pull/101">Oracle-Q development PR #101</a>.</footer>
+</main><script>
+const tbody=document.getElementById('rows'),message=document.getElementById('message');
+async function refresh(){try{const response=await fetch('./arena-feed.json',{cache:'no-store'});if(!response.ok)throw Error('Feed unavailable');const feed=await response.json();if(feed.schema!=='oracle-q-arena-feed-v1'||!Array.isArray(feed.rows))throw Error('Unrecognized feed');
+const rows=feed.rows.filter(x=>x&&x.status==='COMPLETE_DESCRIPTIVE'&&typeof x.market==='string'&&typeof x.candidate_id==='string'&&Number.isFinite(x.net_return_pct)&&Number.isFinite(x.max_drawdown_pct));
+tbody.replaceChildren();if(!rows.length){tbody.innerHTML='<tr><td colspan="5">No verified results published</td></tr>';}else{for(const r of rows){const tr=document.createElement('tr');for(const value of [r.market,r.candidate_id,r.status,r.net_return_pct.toFixed(2)+'%',r.max_drawdown_pct.toFixed(2)+'%']){const td=document.createElement('td');td.textContent=value;tr.append(td)}tbody.append(tr)}}
+document.getElementById('status').textContent='SNAPSHOT • NOT LIVE';message.textContent='Snapshot loaded. Feed timestamps and audit status must be independently verified before labeling results live.';document.getElementById('matches').textContent='Not verified';document.getElementById('error').textContent='';
+}catch(e){document.getElementById('status').textContent='NO VERIFIED LIVE FEED';document.getElementById('error').textContent='No audited feed available yet. This arena is a preview, not a live competition.'}}
+document.getElementById('refresh').addEventListener('click',refresh);refresh();
+</script></body></html>
