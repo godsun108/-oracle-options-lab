@@ -1,0 +1,45 @@
+name: Oracle-Q Arena Pages
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'arena/**'
+      - '.github/workflows/arena-pages.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: oracle-q-arena-pages
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - name: Validate publication boundaries
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          page=Path("arena/index.html").read_text()
+          assert "NO VERIFIED LIVE FEED" in page
+          assert "arena-feed.json" in page
+          assert not Path("arena/arena-feed.json").exists(), "Unreviewed feed cannot be deployed"
+          print("Arena static page verified: no competition results published")
+          PY
+      - name: Prepare Pages site
+        run: |
+          mkdir -p _site
+          cp arena/index.html _site/index.html
+          printf 'Oracle-Q Arena is a research-only spectator preview. No verified live trading feed is connected.\n' > _site/STATUS.txt
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4
