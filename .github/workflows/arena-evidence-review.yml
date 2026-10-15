@@ -8,7 +8,9 @@ on:
       - 'research/arena_frozen_league.py'
       - 'research/export_arena_frozen_league.py'
       - 'research/arena_public_progress.py'
-      - 'tests/test_arena_public_progress.py'
+      - 'research/agent_paper_portfolio.py'
+      - 'tests/test_agent_paper_portfolio.py'
+      - 'tests/test_arena_public_progress.py tests/test_agent_paper_portfolio.py'
       - 'tests/test_arena_frozen_league.py'
       - '.github/workflows/arena-evidence-review.yml'
 permissions:
