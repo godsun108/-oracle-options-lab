@@ -23,13 +23,19 @@ jobs:
           assert "<title>Oracle-Q Arena" in page
           assert "NO VERIFIED LIVE FEED" in page
           assert "arena-feed.json" in page
-          assert not Path("arena/arena-feed.json").exists(), "No unaudited feed may ship in preview"
+          import json
+          feed=json.loads(Path("arena/arena-feed.json").read_text())
+          assert feed["schema"] == "oracle-q-arena-feed-v1"
+          assert feed["rows"] == [] and feed["live"] is False
+          assert feed["orders_enabled"] is False and feed["edge_proven"] is False
+          assert feed["source_kind"] == "NO_VERIFIED_SCORECARD"
           print("Static Arena preview verified: no results shipped")
           PY
       - name: Package mobile preview
         run: |
           mkdir -p dist/arena
           cp arena/index.html dist/arena/index.html
+          cp arena/arena-feed.json dist/arena/arena-feed.json
           cp arena/README.md dist/arena/README.md
       - uses: actions/upload-artifact@v4
         with:
