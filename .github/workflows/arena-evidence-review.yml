@@ -11,7 +11,7 @@ on:
       - 'research/arena_agent_positions.py'
       - 'tests/test_arena_agent_positions.py'
       - 'research/agent_paper_portfolio.py'
-      - 'tests/test_agent_paper_portfolio.py'
+      - 'tests/test_agent_paper_portfolio.py tests/test_arena_agent_positions.py'
       - 'tests/test_arena_public_progress.py tests/test_agent_paper_portfolio.py'
       - 'tests/test_arena_frozen_league.py'
       - '.github/workflows/arena-evidence-review.yml'
