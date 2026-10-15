@@ -7,6 +7,7 @@ import json
 import math
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
+from research.agent_paper_portfolio import verify as verify_portfolio, snapshot as portfolio_snapshot
 from research.edge_lab import IDS
 from research.multi_market_observer import SYMBOLS
 
@@ -20,6 +21,9 @@ def project(source, *, now=None):
     rows = source.get("positions")
     if not isinstance(rows, list) or len(rows) != len(expected):
         raise ValueError("missing agents")
+    portfolios = source.get('portfolios')
+    if not isinstance(portfolios, dict) or set(portfolios) != expected:
+        raise ValueError('missing original agent portfolios')
     seen = set()
     output = []
     for row in rows:
@@ -27,6 +31,12 @@ def project(source, *, now=None):
         if agent not in expected or agent in seen or row.get("symbol") != agent.split("::")[0]:
             raise ValueError("unexpected or duplicate agent")
         seen.add(agent)
+        original = portfolios[agent]
+        verify_portfolio(original)
+        if original.get('agent_id') != agent or original.get('symbol') != row['symbol']:
+            raise ValueError('portfolio identity mismatch')
+        if portfolio_snapshot(original) != row:
+            raise ValueError('published position does not match audited portfolio events')
         if any(row.get(k) is not False for k in ("orders_enabled", "broker_fills_verified", "price_is_live", "edge_proven")):
             raise ValueError("agent cannot claim live fills or proven edge")
         side = row.get("side")
