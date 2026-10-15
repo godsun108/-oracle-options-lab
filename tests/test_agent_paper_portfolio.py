@@ -1,6 +1,5 @@
 import copy
 import unittest
-import copy
 from research.agent_paper_portfolio import initialize, transition, snapshot, verify
 
 
