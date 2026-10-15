@@ -1,6 +1,12 @@
 name: Oracle-Q Arena Evidence Review
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - 'research/arena_frozen_league.py'
+      - 'research/export_arena_frozen_league.py'
+      - 'tests/test_arena_frozen_league.py'
+      - '.github/workflows/arena-evidence-review.yml'
 permissions:
   contents: read
 jobs:
