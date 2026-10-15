@@ -57,6 +57,8 @@ jobs:
         run: |
           if test -s out/edge-source/agent_paper_positions.json; then
             python -m research.arena_agent_positions --source out/edge-source/agent_paper_positions.json --output out/arena-agent-positions.json
+          else
+            echo 'Agent position evidence unavailable in selected production run; no holdings published.'
           fi
       - name: Export audited evidence or explicit missing status
         run: |
