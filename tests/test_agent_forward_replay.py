@@ -57,6 +57,27 @@ class ReplayTests(unittest.TestCase):
         self.assertEqual(row["side"], "FLAT")
         self.assertEqual(row["realized_pnl"], 0)
 
+    def test_all_retained_open_checkpoints_become_observed_marks(self):
+        data = ledger([
+            signal("2026-10-15", "2026-10-15T22:00:00+00:00", 1),
+            opening("2026-10-16", 100),
+            opening("2026-10-19", 105),
+            opening("2026-10-20", 103)])
+        result = replay(data)
+        portfolio = result["portfolios"]["SPY::tsmom_63"]
+        self.assertEqual(len(portfolio["events"]), 3)
+        self.assertEqual([e["price"] for e in portfolio["events"]], [100.0, 105.0, 103.0])
+        self.assertEqual([e["action"] for e in portfolio["events"]],
+                         ["SIMULATED_BUY", "HOLD", "HOLD"])
+        self.assertFalse(result["orders_enabled"])
+
+    def test_replay_is_deterministic_across_identical_ledgers(self):
+        data = ledger([opening("2026-10-16", 100), opening("2026-10-19", 101)])
+        first = replay(data)
+        second = replay(data)
+        self.assertEqual(first["portfolios"], second["portfolios"])
+        self.assertEqual(first["ledger_head_sha256"], second["ledger_head_sha256"])
+
     def test_tampering_rejected(self):
         data = ledger([opening("2026-10-16", 100)])
         data["events"][0]["open_price"] = 999

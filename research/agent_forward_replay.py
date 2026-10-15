@@ -53,23 +53,23 @@ def replay(ledger):
                     # Late signals must not acquire retroactive paper fills.
                     continue
                 pending.append((entry, registered, signal_day, signal["signal"]))
+            # Replay each independently retained source-open checkpoint, not
+            # merely the latest. This creates event-observed marks across runs
+            # without interpolating missing sessions or fabricating prices.
+            targets = {}
             for entry, registered, signal_day, target in sorted(pending):
-                price = opens.get((symbol, entry))
-                if price is None:
-                    continue
-                observed = session_bounds(entry)[0].isoformat()
+                if (symbol, entry) in opens:
+                    if entry in targets:
+                        raise ValueError("multiple eligible targets for one session")
+                    targets[entry] = target
+            for day, price in sorted((day, price) for (sym, day), price in opens.items() if sym == symbol):
+                observed = session_bounds(day)[0].isoformat()
+                # A target registered for this session is applied at its
+                # hypothetical opening price; otherwise mark existing holdings.
+                # Flat agents are also marked, but no position is invented.
+                target = targets.get(day, 1 if state["quantity"] else 0)
                 state = transition(state, target=target, execution_price=price,
                                    observed_at=observed, cost_bps=10)
-            # Mark-to-market at most recent available checkpoint, but do not
-            # silently claim a price was known before its session opened.
-            available = sorted((day, price) for (sym, day), price in opens.items() if sym == symbol)
-            if available:
-                day, price = available[-1]
-                mark_time = session_bounds(day)[0].isoformat()
-                last = state["last_mark"]
-                if last is None or parse_utc_timestamp(mark_time) > parse_utc_timestamp(last["observed_at"]):
-                    state = transition(state, target=1 if state["quantity"] else 0,
-                                       execution_price=price, observed_at=mark_time, cost_bps=10)
             states[agent] = state
             rows.append(snapshot(state))
     return {"schema": "oracle-q-agent-paper-positions-v1",
