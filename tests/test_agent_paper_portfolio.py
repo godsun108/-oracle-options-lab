@@ -1,5 +1,6 @@
 import copy
 import unittest
+import copy
 from research.agent_paper_portfolio import initialize, transition, snapshot, verify
 
 
@@ -36,6 +37,25 @@ class AgentPaperPortfolioTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 transition(state, target=target, execution_price=price, observed_at="2026-10-16T14:30:00Z")
 
+
+    def test_rejects_forged_balance_without_event_change(self):
+        from research.agent_paper_portfolio import initialize, transition, verify
+        state = transition(initialize("SPY::test", "SPY"), target=1, execution_price=100,
+                           observed_at="2026-10-15T13:30:00+00:00")
+        altered = copy.deepcopy(state)
+        altered["cash"] += 200
+        with self.assertRaises(ValueError):
+            verify(altered)
+
+    def test_rejects_forged_realized_profit(self):
+        from research.agent_paper_portfolio import initialize, transition, verify
+        state = initialize("SPY::test", "SPY")
+        state = transition(state, target=1, execution_price=100, observed_at="2026-10-15T13:30:00+00:00")
+        state = transition(state, target=0, execution_price=110, observed_at="2026-10-16T13:30:00+00:00")
+        altered = copy.deepcopy(state)
+        altered["realized_pnl"] += 500
+        with self.assertRaises(ValueError):
+            verify(altered)
 
 if __name__ == "__main__":
     unittest.main()
