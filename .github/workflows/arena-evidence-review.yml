@@ -9,6 +9,8 @@ on:
       - 'research/export_arena_frozen_league.py'
       - 'research/arena_public_progress.py'
       - 'research/arena_agent_positions.py'
+      - 'research/arena_agent_history.py'
+      - 'research/agent_equity_history.py'
       - 'tests/test_arena_agent_positions.py'
       - 'research/agent_paper_portfolio.py'
       - 'tests/test_agent_paper_portfolio.py'
@@ -57,6 +59,7 @@ jobs:
         run: |
           if test -s out/edge-source/agent_paper_positions.json; then
             python -m research.arena_agent_positions --source out/edge-source/agent_paper_positions.json --output out/arena-agent-positions.json
+            python -m research.arena_agent_history --source out/edge-source/agent_paper_positions.json --output out/arena-agent-history.json
           else
             echo 'Agent position evidence unavailable in selected production run; no holdings published.'
           fi
@@ -74,6 +77,7 @@ jobs:
           path: |
             out/arena-frozen-league-review.json
             out/arena-agent-positions.json
+            out/arena-agent-history.json
             out/arena-review-status.json
           if-no-files-found: error
           retention-days: 30
