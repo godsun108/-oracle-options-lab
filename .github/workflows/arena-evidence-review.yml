@@ -8,6 +8,8 @@ on:
       - 'research/arena_frozen_league.py'
       - 'research/export_arena_frozen_league.py'
       - 'research/arena_public_progress.py'
+      - 'research/arena_agent_positions.py'
+      - 'tests/test_arena_agent_positions.py'
       - 'research/agent_paper_portfolio.py'
       - 'tests/test_agent_paper_portfolio.py'
       - 'tests/test_arena_public_progress.py tests/test_agent_paper_portfolio.py'
@@ -51,6 +53,11 @@ jobs:
             gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" --name "oracle-edge-lab-$RUN_ID" --dir out/edge-source
             test -s out/edge-source/edge_forward_ledger.json
           fi
+      - name: Validate and export reviewed simulated agent holdings
+        run: |
+          if test -s out/edge-source/agent_paper_positions.json; then
+            python -m research.arena_agent_positions --source out/edge-source/agent_paper_positions.json --output out/arena-agent-positions.json
+          fi
       - name: Export audited evidence or explicit missing status
         run: |
           if test -s out/edge-source/edge_forward_ledger.json; then
@@ -64,6 +71,7 @@ jobs:
           name: oracle-q-arena-evidence-review
           path: |
             out/arena-frozen-league-review.json
+            out/arena-agent-positions.json
             out/arena-review-status.json
           if-no-files-found: error
           retention-days: 30
