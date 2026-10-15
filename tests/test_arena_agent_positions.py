@@ -11,17 +11,19 @@ NOW = datetime(2026, 10, 19, 20, tzinfo=timezone.utc)
 
 def source():
     rows = []
+    portfolios = {}
     for symbol in SYMBOLS:
         for sid in IDS:
             state = initialize(symbol + "::" + sid, symbol)
             state = transition(state, target=1 if sid == IDS[0] else 0,
                                execution_price=100, observed_at="2026-10-19T13:30:00+00:00")
             rows.append(snapshot(state))
+            portfolios[state['agent_id']] = state
     return {"schema": "oracle-q-agent-paper-positions-v1",
             "source_kind": "REPLAYED_AUDITED_FORWARD_LEDGER",
             "ledger_head_sha256": "a" * 64, "generated_at": NOW.isoformat(),
             "orders_enabled": False, "broker_fills_verified": False,
-            "price_is_live": False, "edge_proven": False, "positions": rows}
+            "price_is_live": False, "edge_proven": False, "positions": rows, "portfolios": portfolios}
 
 
 class ProjectionTests(unittest.TestCase):
@@ -40,6 +42,18 @@ class ProjectionTests(unittest.TestCase):
     def test_rejects_false_equity(self):
         data = source()
         data["positions"][0]["equity"] += 500
+        with self.assertRaises(ValueError):
+            project(data, now=NOW)
+
+    def test_rejects_forged_position_even_if_balanced(self):
+        data = source()
+        data['positions'][0]['realized_pnl'] += 123
+        with self.assertRaises(ValueError):
+            project(data, now=NOW)
+
+    def test_rejects_tampered_event(self):
+        data = source()
+        data['portfolios']['SPY::tsmom_63']['events'][0]['price'] = 999
         with self.assertRaises(ValueError):
             project(data, now=NOW)
 
