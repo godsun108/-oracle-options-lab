@@ -30,6 +30,18 @@ jobs:
           mkdir -p out/edge-source
           RUN_ID=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow edge-lab.yml --branch main --status success --limit 30 --json databaseId,event --jq '[.[] | select(.event == "schedule" or .event == "workflow_dispatch" or .event == "push")][0].databaseId // empty')
           if [ -n "$RUN_ID" ]; then
+            export RUN_ID
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID" > out/edge-source/source-run.json
+            python - <<'PY'
+          import json
+          from pathlib import Path
+          r=json.loads(Path("out/edge-source/source-run.json").read_text())
+          assert r["id"] == int(__import__("os").environ["RUN_ID"]), "run identity mismatch"
+          assert r["head_branch"] == "main", "not a main-branch run"
+          assert r["conclusion"] == "success" and r["status"] == "completed", "not a completed successful run"
+          assert r["event"] in ("schedule", "workflow_dispatch", "push"), "not a production event"
+          assert r["path"] == ".github/workflows/edge-lab.yml", "not Edge Lab production workflow"
+          PY
             gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" --name "oracle-edge-lab-$RUN_ID" --dir out/edge-source
             test -s out/edge-source/edge_forward_ledger.json
           fi
