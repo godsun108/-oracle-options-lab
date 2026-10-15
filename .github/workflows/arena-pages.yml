@@ -88,6 +88,21 @@ jobs:
           assert all(d[k] is False for k in ('price_is_live','orders_enabled','broker_fills_verified','edge_proven'))
           assert len(d['positions']) in (0,18)
           PY
+      - name: Prepare audited agent event-mark history
+        run: |
+          if test -s out/arena-review/arena-agent-history.json; then
+            cp out/arena-review/arena-agent-history.json out/arena-agent-history.json
+          else
+            printf '%s\\n' '{"schema":"oracle-q-arena-agent-history-v1","source_kind":"NO_VERIFIED_HISTORY","orders_enabled":false,"price_is_live":false,"broker_fills_verified":false,"edge_proven":false,"history_is_daily":false,"promotion_eligible":false,"agents":[]}' > out/arena-agent-history.json
+          fi
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path("out/arena-agent-history.json").read_text())
+          assert d["schema"]=="oracle-q-arena-agent-history-v1"
+          assert all(d[k] is False for k in ("orders_enabled","price_is_live","broker_fills_verified","edge_proven","history_is_daily","promotion_eligible"))
+          assert len(d["agents"]) in (0,18)
+          PY
       - name: Prepare Pages site
         run: |
           mkdir -p _site
@@ -95,6 +110,7 @@ jobs:
           cp arena/index.html _site/arena/index.html
           cp out/arena-feed.json _site/arena/arena-feed.json
           cp out/arena-agent-positions.json _site/arena/arena-agent-positions.json
+          cp out/arena-agent-history.json _site/arena/arena-agent-history.json
           printf '<!doctype html><meta http-equiv="refresh" content="0; url=./arena/"><a href="./arena/">Oracle-Q Arena</a>\n' > _site/index.html
           printf 'Oracle-Q Arena is a research-only spectator preview. No verified live trading feed is connected.\n' > _site/arena/STATUS.txt
       - uses: actions/upload-pages-artifact@v3
