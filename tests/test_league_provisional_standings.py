@@ -25,6 +25,10 @@ class ProvisionalStandingsTests(unittest.TestCase):
     def test_complete_session_has_six_duels_and_six_crowns(self):
         result = project(portfolio_set(), ["2026-10-19"])
         self.assertEqual(result["included_complete_sessions"], ["2026-10-19"])
+        self.assertEqual(result["evidence_readiness"], "COMPLETE_COMPARABLE_OPEN_TO_OPEN_MARKS")
+        self.assertEqual(result["complete_session_count"], 1)
+        self.assertEqual(result["agent_count"], 18)
+        self.assertEqual(result["daily_matches_eligible_for_provisional_scoring"], 6)
         self.assertEqual(len(result["daily"][0]["duels"]), 6)
         self.assertEqual(len(result["daily"][0]["market_crowns"]), 6)
         self.assertTrue(all(c["winner"] is None for c in result["daily"][0]["market_crowns"]))
@@ -36,6 +40,8 @@ class ProvisionalStandingsTests(unittest.TestCase):
         self.assertEqual(result["included_complete_sessions"], [])
         self.assertEqual(result["excluded_incomplete_sessions"], ["2026-10-19"])
         self.assertIsNone(result["comparable_market_returns"])
+        self.assertEqual(result["evidence_readiness"], "INSUFFICIENT_COMPARABLE_MARKS")
+        self.assertEqual(result["daily_matches_eligible_for_provisional_scoring"], 0)
 
     def test_invalid_session_order_rejected(self):
         with self.assertRaises(ValueError):
