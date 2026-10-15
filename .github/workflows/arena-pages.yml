@@ -4,6 +4,7 @@ on:
     branches: [main]
     paths:
       - 'arena/**'
+      - 'tests/check_arena_html.mjs'
       - '.github/workflows/arena-pages.yml'
   workflow_dispatch:
   schedule:
@@ -26,6 +27,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify Arena HTML and JavaScript before deployment
+        run: node tests/check_arena_html.mjs
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'

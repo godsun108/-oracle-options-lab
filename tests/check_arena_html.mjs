@@ -1,0 +1,20 @@
+import { readFileSync } from 'node:fs';
+import { Script } from 'node:vm';
+import assert from 'node:assert/strict';
+
+const page = readFileSync('arena/index.html', 'utf8');
+const opens = [...page.matchAll(/<script(?:\s[^>]*)?>/gi)];
+const closes = [...page.matchAll(/<\/script\s*>/gi)];
+assert.equal(opens.length, 1, 'Arena must have one script opening');
+assert.equal(closes.length, 1, 'Arena must have one script closing');
+const start = opens[0].index + opens[0][0].length;
+const end = closes[0].index;
+assert.ok(end > start, 'script close must follow open');
+const script = page.slice(start, end);
+new Script(script, { filename: 'arena-inline.js' });
+assert.match(script, /refreshPositions\(\)/, 'position feed must initialize');
+assert.match(script, /refreshHistory\(\)/, 'history feed must initialize');
+assert.match(script, /refresh\(\)/, 'competition feed must initialize');
+assert.equal(page.slice(end + closes[0][0].length).trim(), '</body></html>', 'no raw script after closing tag');
+assert.equal((page.match(/<\/html>/gi) || []).length, 1, 'exactly one closing HTML tag');
+console.log('Arena inline JS parses and HTML script boundary is intact.');
