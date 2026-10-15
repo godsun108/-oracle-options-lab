@@ -73,12 +73,28 @@ jobs:
               assert feed["source_kind"] == "AUDITED_FROZEN_PAPER_LEAGUE"
               assert len(feed["rows"]) == 6
           PY
+      - name: Prepare public agent snapshot
+        run: |
+          if test -s out/arena-review/arena-agent-positions.json; then
+            cp out/arena-review/arena-agent-positions.json out/arena-agent-positions.json
+          else
+            printf '%s\\n' '{"schema":"oracle-q-arena-agent-positions-v1","source_kind":"NO_VERIFIED_AGENT_POSITIONS","price_is_live":false,"orders_enabled":false,"broker_fills_verified":false,"edge_proven":false,"positions":[],"warning":"No reviewed agent positions available."}' > out/arena-agent-positions.json
+          fi
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('out/arena-agent-positions.json').read_text())
+          assert d['schema']=='oracle-q-arena-agent-positions-v1'
+          assert all(d[k] is False for k in ('price_is_live','orders_enabled','broker_fills_verified','edge_proven'))
+          assert len(d['positions']) in (0,18)
+          PY
       - name: Prepare Pages site
         run: |
           mkdir -p _site
           mkdir -p _site/arena
           cp arena/index.html _site/arena/index.html
           cp out/arena-feed.json _site/arena/arena-feed.json
+          cp out/arena-agent-positions.json _site/arena/arena-agent-positions.json
           printf '<!doctype html><meta http-equiv="refresh" content="0; url=./arena/"><a href="./arena/">Oracle-Q Arena</a>\n' > _site/index.html
           printf 'Oracle-Q Arena is a research-only spectator preview. No verified live trading feed is connected.\n' > _site/arena/STATUS.txt
       - uses: actions/upload-pages-artifact@v3
