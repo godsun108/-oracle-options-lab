@@ -43,6 +43,9 @@ def replay(ledger):
                     continue
                 if signal.get("signal") not in (0, 1) or type(signal["signal"]) is not int:
                     raise ValueError("invalid target")
+                # Legacy hash-valid records without timestamps are not tradable.
+                if not signal.get("registered_at"):
+                    continue
                 registered = parse_utc_timestamp(signal["registered_at"])
                 entry = next_session(signal_day)
                 entry_open = session_bounds(entry)[0]
