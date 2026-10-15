@@ -9,6 +9,7 @@ on:
       - '.github/workflows/arena-evidence-review.yml'
 permissions:
   contents: read
+  actions: read
 jobs:
   evidence-review:
     runs-on: ubuntu-latest
