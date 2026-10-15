@@ -25,9 +25,7 @@ def daily_duel(session, left, right, evidence):
     """Winner gets one match point; draws get none; no positive-profit claim for losses."""
     if left == right or left.split("::")[0] != right.split("::")[0]:
         raise ValueError("daily duel must be between different agents in one market")
-    if left.split("::")[0] not in MARKETS or any(
-        a.split("::")[-1] not in STRATEGIES for a in (left, right)
-    ):
+    if left not in {left.split("::")[0] + "::" + s for s in STRATEGIES} or right not in {right.split("::")[0] + "::" + s for s in STRATEGIES} or left.split("::")[0] not in MARKETS:
         raise ValueError("unregistered competitor")
     a = _check(evidence.get(left), session=session, agent=left)
     b = _check(evidence.get(right), session=session, agent=right)
@@ -66,5 +64,5 @@ def weekly_market_returns(sessions, evidence):
             equity *= 1 + sum(values) / len(values) / 100
         result[market] = (equity - 1) * 100
     return {"sessions": list(sessions), "market_net_return_pct": result,
-            "winner": max(result, key=result.get) if len(set(result.values())) == len(result) else None,
+            "winner": next((m for m, v in result.items() if v == max(result.values())), None) if sum(v == max(result.values()) for v in result.values()) == 1 else None,
             "orders_enabled": False, "edge_proven": False}
