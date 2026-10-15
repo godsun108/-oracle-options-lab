@@ -27,6 +27,9 @@ on:
       - 'tests/test_edge_regime_context.py'
       - 'research/edge_registry.json'
       - 'research/edge_paper_league.py'
+      - 'research/agent_paper_portfolio.py'
+      - 'research/agent_forward_replay.py'
+      - 'tests/test_agent_forward_replay.py'
       - 'research/edge_paper_league_rules.json'
       - 'tests/test_edge_paper_league.py'
       - 'tests/test_edge_lab.py'
@@ -38,6 +41,9 @@ on:
       - "tests/test_edge_regime_context.py"
       - "research/edge_registry.json"
       - "research/edge_paper_league.py"
+      - "research/agent_paper_portfolio.py"
+      - "research/agent_forward_replay.py"
+      - "tests/test_agent_forward_replay.py"
       - "research/edge_paper_league_rules.json"
       - "tests/test_edge_paper_league.py"
       - "research/edge_evidence_restore.py"
@@ -87,7 +93,7 @@ jobs:
           python-version: "3.11"
       - name: Verify pre-registered edge lab research
         # Diagnostic probes are tested without network access or credentials.
-        run: python -m unittest tests.test_edge_paper_league tests.test_edge_regime_context tests.test_edge_history_diagnostic tests.test_edge_source_replay tests.test_edge_lab tests.test_edge_forward_paper tests.test_edge_forward_scorecard tests.test_edge_forward_integrity_audit tests.test_edge_forward_uncertainty tests.test_edge_evidence_restore tests.test_edge_session_calendar tests.test_edge_execution_sensitivity -v
+        run: python -m unittest tests.test_edge_paper_league tests.test_edge_regime_context tests.test_edge_history_diagnostic tests.test_edge_source_replay tests.test_edge_lab tests.test_edge_forward_paper tests.test_edge_forward_scorecard tests.test_edge_forward_integrity_audit tests.test_edge_forward_uncertainty tests.test_edge_evidence_restore tests.test_edge_session_calendar tests.test_edge_execution_sensitivity tests.test_agent_paper_portfolio tests.test_agent_forward_replay -v
 
   research:
     if: github.event_name != 'pull_request'
@@ -127,6 +133,8 @@ jobs:
         run: python -m research.edge_execution_sensitivity --ledger edge_forward_ledger.json --output edge_execution_sensitivity.json
       - name: Score fixed prospective paper league
         run: python -m research.edge_paper_league --ledger edge_forward_ledger.json --output edge_paper_league.json
+      - name: Replay 18 agent paper portfolios from prospective evidence
+        run: python -m research.agent_forward_replay --ledger edge_forward_ledger.json --output agent_paper_positions.json
       - name: Summarize research without promoting historical backtests to proven edges
         if: always()
         run: |
@@ -182,6 +190,7 @@ jobs:
             edge_forward_integrity_audit.json
             edge_execution_sensitivity.json
             edge_paper_league.json
+            agent_paper_positions.json
             research/edge_paper_league_rules.json
             edge_forward_continuity.json
             edge-restore/edge_restore_manifest.json
