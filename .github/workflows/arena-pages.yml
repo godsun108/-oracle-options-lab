@@ -36,8 +36,10 @@ jobs:
       - name: Prepare Pages site
         run: |
           mkdir -p _site
-          cp arena/index.html _site/index.html
-          printf 'Oracle-Q Arena is a research-only spectator preview. No verified live trading feed is connected.\n' > _site/STATUS.txt
+          mkdir -p _site/arena
+          cp arena/index.html _site/arena/index.html
+          printf '<!doctype html><meta http-equiv="refresh" content="0; url=./arena/"><a href="./arena/">Oracle-Q Arena</a>\n' > _site/index.html
+          printf 'Oracle-Q Arena is a research-only spectator preview. No verified live trading feed is connected.\n' > _site/arena/STATUS.txt
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
