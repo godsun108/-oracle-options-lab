@@ -21,3 +21,7 @@ This PR does not enable GitHub Pages, create a public deployment, or add a write
 ## Future live mode
 
 A live feed needs an independently validated timestamped observation publisher, bounded refresh cadence, source-health indicators, immutable evidence references, and reconciliation checks. A page refresh alone is not proof of live or profitable trading.
+
+## Build a preview without deploying
+
+From the GitHub Actions tab, manually run **Oracle-Q Arena Static Preview** on the reviewed branch. It validates the HTML, rejects a checked-in unreviewed feed, and produces a downloadable seven-day static-site artifact. This is **not** a public website or live feed. Hosting requires a separate reviewed deployment configuration.
