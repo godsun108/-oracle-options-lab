@@ -49,6 +49,14 @@ class ReplayTests(unittest.TestCase):
         row = next(p for p in replay(data)["positions"] if p["agent_id"] == "SPY::tsmom_63")
         self.assertEqual(row["side"], "FLAT")
 
+    def test_legacy_untimed_signal_never_opens_position(self):
+        old = signal("2026-10-15", "2026-10-15T22:00:00+00:00", 1)
+        del old["registered_at"]
+        data = ledger([old, opening("2026-10-16", 100)])
+        row = next(p for p in replay(data)["positions"] if p["agent_id"] == "SPY::tsmom_63")
+        self.assertEqual(row["side"], "FLAT")
+        self.assertEqual(row["realized_pnl"], 0)
+
     def test_tampering_rejected(self):
         data = ledger([opening("2026-10-16", 100)])
         data["events"][0]["open_price"] = 999
