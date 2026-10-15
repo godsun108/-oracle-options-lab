@@ -35,6 +35,9 @@ async function refreshPositions(){
  const card=document.createElement('article');card.className='agent-card';const strong=document.createElement('strong');strong.textContent=p.agent_id+' · '+p.side;card.append(strong);const dl=document.createElement('dl');for(const [k,v] of [['Equity',values[5]],['Unrealized P&L',values[6]],['Quantity',values[2]],['Entry',values[3]],['Last mark',values[4]],['Mark time',p.last_mark?.observed_at||'—']]){const group=document.createElement('div'),dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=k;dd.textContent=v;group.append(dt,dd);dl.append(group)}card.append(dl);cards.append(card)}
  ranked.sort((a,b)=>b.equity-a.equity||a.agent_id.localeCompare(b.agent_id));for(const p of ranked){const item=document.createElement('div');item.className='agent-card';item.textContent=p.agent_id+' · '+((p.equity/2000-1)*100).toFixed(3)+'% · '+money(p.equity)+' equity';ranking.append(item)}
  $('snapshot-ranking-note').textContent=f.positions.length===18?'Provisional ranking of 18 hypothetical $2,000 accounts; no promotion eligibility.':'Incomplete agent snapshot; ranking withheld.';
+ const held=ranked.filter(p=>p.side==='LONG'||p.side==='SHORT').length;
+ const flat=ranked.filter(p=>p.side==='FLAT').length;
+ $('participation-status').textContent=ranked.length===18&&held+flat===18?`${held} of 18 agents hold simulated positions; ${flat} flat. Delayed reviewed snapshot, not current-session trades.`:'Participation withheld: incomplete or invalid side data.';
  $('positions-message').textContent='Delayed simulated event marks • '+String(f.source_generated_at||'no timestamp')+' • Not broker fills.';
  }catch(e){body.replaceChildren();cards.replaceChildren();ranking.replaceChildren();$('positions-message').textContent='Reviewed agent positions unavailable or invalid.';$('snapshot-ranking-note').textContent='Ranking withheld: evidence unavailable.'}
 }
