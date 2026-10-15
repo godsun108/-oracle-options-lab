@@ -1,6 +1,10 @@
 name: Oracle-Q Arena Static Preview
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - 'arena/**'
+      - '.github/workflows/arena-static-preview.yml'
 permissions:
   contents: read
 jobs:
