@@ -22,7 +22,9 @@ def score(trades, *, min_trades=30, max_drawdown_limit=0.20):
         value=t["gross_pnl"]-t["total_cost"]
         net.append(value)
         # Per-trade return assumes nonoverlapping, sequential trades and no deposits.
-        if equity is None:\n            equity=t["starting_equity"]; peak=equity\n        if not math.isclose(t["starting_equity"],equity,rel_tol=1e-8,abs_tol=1e-8):
+        if equity is None:
+            equity=t["starting_equity"]; peak=equity
+        if not math.isclose(t["starting_equity"],equity,rel_tol=1e-8,abs_tol=1e-8):
             raise ValueError("equity discontinuity or unsupported overlapping trades")
         equity+=value
         if equity<=0:
