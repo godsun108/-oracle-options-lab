@@ -15,9 +15,9 @@ class ScorecardTests(unittest.TestCase):
     def test_small_winner_not_enough(self):
         self.assertFalse(score(trades([10]*5))["preliminary_edge_gate_passed"])
     def test_costs_count(self):
-        a=trades([2]*30)
-        for x in a: x["gross_pnl"]=0.5
+        a=trades([-0.5]*30)
         self.assertLess(score(a)["net_expectancy_per_trade"],0)
+        self.assertAlmostEqual(a[0]["gross_pnl"]-a[0]["total_cost"],-0.5)
     def test_loss_streak_fails(self):
         self.assertFalse(score(trades([-5]*30))["preliminary_edge_gate_passed"])
     def test_profitable_sample_is_still_not_promotion(self):
