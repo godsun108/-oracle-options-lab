@@ -1,0 +1,29 @@
+name: Forward Observation Admissibility
+on:
+  push:
+    paths:
+      - 'research/forward_observation_admissibility_v1.py'
+      - 'research/test_forward_observation_admissibility_v1.py'
+      - 'prospective_records/**'
+      - '.github/workflows/forward-observation-admissibility.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  observation-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run synthetic admissibility tests
+        run: python -m unittest discover -s research -p 'test_forward_observation_admissibility_v1.py' -v
+      - name: Audit archived forward observations
+        run: python research/forward_observation_admissibility_v1.py prospective_records > forward-observation-audit.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: forward-observation-admissibility
+          path: forward-observation-audit.json
+          retention-days: 14
