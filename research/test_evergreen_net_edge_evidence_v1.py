@@ -14,6 +14,11 @@ class NetEdgeTests(unittest.TestCase):
   r=evaluate(packet([trade("a",100,1,1,20)]))
   self.assertEqual(r["reportedExcessPnl"],78)
   self.assertFalse(r["edgeEstablished"]);self.assertFalse(r["promotionAuthorized"])
+ def test_missing_benchmark_does_not_fabricate_excess_return(self):
+  r=evaluate(packet([trade("a",10,1,1,None)]))
+  self.assertIsNone(r["reportedExcessPnl"])
+  self.assertFalse(r["benchmarkCoverageComplete"])
+  self.assertIn("benchmark_missing",r["reasons"])
  def test_duplicate_trade_refused(self):
   with self.assertRaisesRegex(ValueError,"duplicate"):evaluate(packet([trade("a",1),trade("a",2)]))
  def test_negative_cost_refused(self):
