@@ -4,6 +4,8 @@ on:
     paths:
       - 'research/edge_profitability_scorecard_v1.py'
       - 'research/test_edge_profitability_scorecard_v1.py'
+      - 'research/edge_evidence_readiness_v1.py'
+      - 'research/test_edge_evidence_readiness_v1.py'
       - '.github/workflows/edge-profitability-scorecard-tests.yml'
   workflow_dispatch:
 permissions:
@@ -18,3 +20,4 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m unittest discover -s research -p 'test_edge_profitability_scorecard_v1.py' -v
+      - run: python -m unittest discover -s research -p 'test_edge_evidence_readiness_v1.py' -v
