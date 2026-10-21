@@ -6,7 +6,7 @@ from pathlib import Path
 def score(trades, *, min_trades=30, max_drawdown_limit=0.20):
     if not isinstance(trades, list):
         raise ValueError("trades must be a list")
-    seen=set(); net=[]; equity=1.0; peak=1.0; drawdown=0.0
+    seen=set(); net=[]; equity=None; peak=None; drawdown=0.0
     for t in trades:
         if not isinstance(t,dict) or not isinstance(t.get("id"),str) or not t["id"] or t["id"] in seen:
             raise ValueError("invalid or duplicate trade ID")
@@ -22,7 +22,7 @@ def score(trades, *, min_trades=30, max_drawdown_limit=0.20):
         value=t["gross_pnl"]-t["total_cost"]
         net.append(value)
         # Per-trade return assumes nonoverlapping, sequential trades and no deposits.
-        if not math.isclose(t["starting_equity"],equity,rel_tol=1e-8,abs_tol=1e-8):
+        if equity is None:\n            equity=t["starting_equity"]; peak=equity\n        if not math.isclose(t["starting_equity"],equity,rel_tol=1e-8,abs_tol=1e-8):
             raise ValueError("equity discontinuity or unsupported overlapping trades")
         equity+=value
         if equity<=0:
