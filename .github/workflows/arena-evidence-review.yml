@@ -10,6 +10,8 @@ on:
       - 'research/arena_public_progress.py'
       - 'research/arena_agent_positions.py'
       - 'research/arena_agent_history.py'
+      - 'research/arena_paper_delta.py'
+      - 'tests/test_arena_paper_delta.py'
       - 'research/agent_equity_history.py'
       - 'tests/test_arena_agent_positions.py'
       - 'research/agent_paper_portfolio.py'
@@ -31,7 +33,7 @@ jobs:
       - name: Install research dependencies
         run: python -m pip install pytest numpy pandas requests scikit-learn
       - name: Verify frozen-league adapter
-        run: python -m pytest -q tests/test_arena_frozen_league.py tests/test_edge_paper_league.py tests/test_arena_public_progress.py
+        run: python -m pytest -q tests/test_arena_frozen_league.py tests/test_edge_paper_league.py tests/test_arena_public_progress.py tests/test_arena_paper_delta.py
       - name: Retrieve latest successful production Edge Lab artifact
         if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
         env:
