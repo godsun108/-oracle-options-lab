@@ -7,6 +7,10 @@ on:
       - 'tests/check_arena_html.mjs'
       - '.github/workflows/arena-pages.yml'
   workflow_dispatch:
+  workflow_run:
+    workflows: ['Oracle-Q Arena Evidence Review']
+    types: [completed]
+    branches: [main]
   schedule:
     - cron: '10 1 * * 2-6'
 permissions:
@@ -19,7 +23,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   deploy:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && (github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && (github.event.workflow_run.event == 'schedule' || github.event.workflow_run.event == 'workflow_dispatch')))
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
