@@ -86,7 +86,7 @@ jobs:
           if test -s out/previous-review/arena-agent-positions.json && test -s out/arena-agent-positions.json; then
             python -m research.arena_paper_delta --previous out/previous-review/arena-agent-positions.json --current out/arena-agent-positions.json --output out/arena-paper-delta.json
           else
-            printf '%s\\n' '{"schema":"oracle-q-arena-paper-delta-v1","status":"NO_COMPARABLE_EVIDENCE","orders_enabled":false,"broker_fills_verified":false,"edge_proven":false}' > out/arena-paper-delta.json
+            printf '%s\n' '{"schema":"oracle-q-arena-paper-delta-v1","status":"NO_COMPARABLE_EVIDENCE","orders_enabled":false,"broker_fills_verified":false,"edge_proven":false}' > out/arena-paper-delta.json
           fi
       - uses: actions/upload-artifact@v4
         with:
