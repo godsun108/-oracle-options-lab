@@ -114,7 +114,7 @@ jobs:
           if test -s out/arena-review/arena-paper-delta.json; then
             cp out/arena-review/arena-paper-delta.json out/arena-paper-delta.json
           else
-            printf '%s\\n' '{"schema":"oracle-q-arena-paper-delta-v1","status":"NO_COMPARABLE_EVIDENCE","orders_enabled":false,"broker_fills_verified":false,"edge_proven":false}' > out/arena-paper-delta.json
+            printf '%s\n' '{"schema":"oracle-q-arena-paper-delta-v1","status":"NO_COMPARABLE_EVIDENCE","orders_enabled":false,"broker_fills_verified":false,"edge_proven":false}' > out/arena-paper-delta.json
           fi
           python - <<'PY'
           import json
