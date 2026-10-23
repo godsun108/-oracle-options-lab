@@ -10,6 +10,8 @@ on:
       - 'research/arena_public_progress.py'
       - 'research/arena_agent_positions.py'
       - 'research/arena_agent_history.py'
+      - 'research/arena_paper_delta.py'
+      - 'tests/test_arena_paper_delta.py'
       - 'research/agent_equity_history.py'
       - 'tests/test_arena_agent_positions.py'
       - 'research/agent_paper_portfolio.py'
@@ -31,7 +33,7 @@ jobs:
       - name: Install research dependencies
         run: python -m pip install pytest numpy pandas requests scikit-learn
       - name: Verify frozen-league adapter
-        run: python -m pytest -q tests/test_arena_frozen_league.py tests/test_edge_paper_league.py tests/test_arena_public_progress.py
+        run: python -m pytest -q tests/test_arena_frozen_league.py tests/test_edge_paper_league.py tests/test_arena_public_progress.py tests/test_arena_paper_delta.py
       - name: Retrieve latest successful production Edge Lab artifact
         if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
         env:
@@ -71,6 +73,21 @@ jobs:
             mkdir -p out
             printf '%s\\n' '{"schema":"oracle-q-arena-review-status-v1","status":"NO_LEDGER_AVAILABLE","published":false,"orders_enabled":false,"warning":"No eligible production edge-lab ledger was available. No scores generated."}' > out/arena-review-status.json
           fi
+      - name: Compare with previous reviewed production snapshot
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p out/previous-review
+          RUN_ID=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow arena-evidence-review.yml --branch main --status success --limit 30 --json databaseId,event --jq '[.[] | select(.event == "schedule" or .event == "workflow_dispatch")][0].databaseId // empty')
+          if [ -n "$RUN_ID" ]; then
+            gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" --name oracle-q-arena-evidence-review --dir out/previous-review
+          fi
+          if test -s out/previous-review/arena-agent-positions.json && test -s out/arena-agent-positions.json; then
+            python -m research.arena_paper_delta --previous out/previous-review/arena-agent-positions.json --current out/arena-agent-positions.json --output out/arena-paper-delta.json
+          else
+            printf '%s\\n' '{"schema":"oracle-q-arena-paper-delta-v1","status":"NO_COMPARABLE_EVIDENCE","orders_enabled":false,"broker_fills_verified":false,"edge_proven":false}' > out/arena-paper-delta.json
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: oracle-q-arena-evidence-review
@@ -78,6 +95,7 @@ jobs:
             out/arena-frozen-league-review.json
             out/arena-agent-positions.json
             out/arena-agent-history.json
+            out/arena-paper-delta.json
             out/arena-review-status.json
           if-no-files-found: error
           retention-days: 30
