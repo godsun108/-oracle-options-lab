@@ -28,4 +28,20 @@ class PerformanceTests(unittest.TestCase):
         x=record(initial(),symbol="SPY_P",side="BUY",quantity=1,quote=Q,as_of=T1)
         x["entries"][0]["quantity"]=2
         with self.assertRaises(ValueError):report(x)
+
+    def test_invalid_marks_do_not_become_profit(self):
+        x=record(initial(),symbol="SPY_P",side="BUY",quantity=1,quote=Q,as_of=T1)
+        for mark in ({}, {"bid":5,"age_seconds":0,"bid_size":1.5},
+                     {"bid":True,"age_seconds":0,"bid_size":2},
+                     {"bid":float("nan"),"age_seconds":0,"bid_size":2}):
+            with self.subTest(mark=mark):
+                r=report(x,{"SPY_P":mark})
+                self.assertIsNone(r["hypothetical_total_pnl"])
+                self.assertEqual(r["unmarked_symbols"],["SPY_P"])
+                self.assertFalse(r["broker_fills_verified"])
+                self.assertEqual(r["quote_evidence_entries"],1)
+    def test_invalid_age_bound(self):
+        for bound in (float("nan"),float("inf"),True,-1):
+            with self.assertRaises(ValueError):report(initial(),max_age_seconds=bound)
+
 if __name__=="__main__":unittest.main()

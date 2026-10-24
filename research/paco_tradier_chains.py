@@ -6,6 +6,7 @@ fresh two-second quote evidence. Capture snapshots for research with provenance
 and mark quote freshness UNVERIFIED.
 """
 import json
+from math import isfinite
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
@@ -34,7 +35,7 @@ def fetch_chain(symbol, expiration, token, *, opener=urllib.request.urlopen,
             bid=float(item["bid"]);ask=float(item["ask"])
             bid_size=int(item.get("bidsize") or 0)
             ask_size=int(item.get("asksize") or 0)
-            if not symbol_id or bid<0 or ask<=0 or bid>ask:continue
+            if not symbol_id or not all(isfinite(x) for x in (bid,ask)) or bid<0 or ask<=0 or bid>ask or bid_size<0 or ask_size<0:continue
             results.append({"occ_symbol":symbol_id,"type":item["option_type"],
                             "expiration":expiration,"strike":item.get("strike"),
                             "bid":bid,"ask":ask,"bid_size":bid_size,"ask_size":ask_size,
