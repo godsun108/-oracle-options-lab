@@ -10,19 +10,23 @@ from math import isfinite
 def validate(raw, *, now_iso, max_age_seconds=2.0):
     now=datetime.fromisoformat(now_iso)
     if now.tzinfo is None:raise ValueError("timezone-aware clock required")
-    if max_age_seconds<=0:raise ValueError("invalid age bound")
+    if not isfinite(max_age_seconds) or max_age_seconds<=0:raise ValueError("invalid age bound")
     clean=[]
     rejected=[]
     seen=set()
     for i,q in enumerate(raw):
         try:
-            symbol=str(q["occ_symbol"])
+            if any(not isinstance(q[k],str) or not q[k].strip() for k in ("occ_symbol","provider","provider_quote_id")):
+                raise ValueError("missing quote identity")
+            symbol=q["occ_symbol"]
             provider=str(q["provider"])
             provider_id=str(q["provider_quote_id"])
             stamp=datetime.fromisoformat(q["provider_timestamp"])
             if stamp.tzinfo is None:raise ValueError("naive provider timestamp")
             bid=float(q["bid"]);ask=float(q["ask"])
-            bid_size=int(q["bid_size"]);ask_size=int(q["ask_size"])
+            if any(type(q[k]) is not int for k in ("bid_size","ask_size")):
+                raise ValueError("invalid displayed size")
+            bid_size=q["bid_size"];ask_size=q["ask_size"]
             if not symbol or not provider or not provider_id:
                 raise ValueError("missing quote identity")
             if (symbol,provider_id) in seen:
