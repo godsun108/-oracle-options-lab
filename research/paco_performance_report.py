@@ -7,6 +7,8 @@ from math import isfinite
 from research.paco_paper_ledger import verify
 
 def report(ledger, marks=None, *, max_age_seconds=2.0):
+    if type(max_age_seconds) not in (int,float) or not isfinite(max_age_seconds) or max_age_seconds<=0:
+        raise ValueError("invalid age bound")
     audit=verify(ledger)
     lots={}
     realized=0.0
@@ -32,7 +34,12 @@ def report(ledger, marks=None, *, max_age_seconds=2.0):
         m=marks.get(sym)
         if not m:
             marked=False;missing.append(sym);continue
-        bid=float(m["bid"]);age=float(m["age_seconds"]);size=int(m["bid_size"])
+        try:
+            if any(isinstance(m[k],bool) for k in ("bid","age_seconds")) or type(m["bid_size"]) is not int:
+                raise ValueError("invalid mark")
+            bid=float(m["bid"]);age=float(m["age_seconds"]);size=m["bid_size"]
+        except (KeyError,TypeError,ValueError,OverflowError):
+            marked=False;missing.append(sym);continue
         if not (isfinite(bid) and isfinite(age) and bid>=0 and 0<=age<=max_age_seconds and size>=held):
             marked=False;missing.append(sym);continue
         basis=sum(qty*unit for qty,unit in lots[sym])
@@ -40,6 +47,10 @@ def report(ledger, marks=None, *, max_age_seconds=2.0):
     complete=marked
     return {"schema":"paco-paper-performance-v1",
             "audit_verified":audit["verified"],
+            "quote_evidence_entries":audit["quote_evidence_entries"],
+            "legacy_entries_without_quote_evidence":audit["legacy_entries_without_quote_evidence"],
+            "independent_quote_freshness_verified":False,
+            "broker_fills_verified":False,
             "hypothetical_trades":audit["entry_count"],
             "closed_contracts":closed,
             "open_contracts":audit["open_contracts"],
