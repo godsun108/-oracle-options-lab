@@ -15,15 +15,22 @@ BASE="https://api.tradier.com/v1"
 def timing_evidence(item, observed_at):
     observed=datetime.fromisoformat(observed_at.replace("Z","+00:00"))
     if observed.tzinfo is None:raise ValueError("timezone-aware observation required")
-    result={"timestamp_basis":"provider-declared Unix seconds",
+    result={"timestamp_basis":"provider-declared Unix time; seconds or milliseconds recorded per side",
             "independent_quote_freshness_verified":False}
     for side in ("bid","ask"):
         value=item.get(side+"_date")
         evidence={"raw_unix_timestamp":value if type(value) is int else None,
-                  "timestamp":None,"age_seconds":None,"status":"MISSING_OR_INVALID"}
+                  "timestamp":None,"age_seconds":None,"unit":None,"status":"MISSING_OR_INVALID"}
         if type(value) is int and value>0:
             try:
-                stamp=datetime.fromtimestamp(value,timezone.utc)
+                # Observed production artifact 12578169176 returns 13-digit milliseconds.
+                # Keep the original integer and explicit unit; reject microseconds/other ranges.
+                if 1_000_000_000<=value<10_000_000_000:
+                    seconds=value;evidence["unit"]="seconds"
+                elif 1_000_000_000_000<=value<10_000_000_000_000:
+                    seconds=value/1000;evidence["unit"]="milliseconds"
+                else:raise ValueError("unsupported timestamp unit")
+                stamp=datetime.fromtimestamp(seconds,timezone.utc)
                 age=(observed-stamp).total_seconds()
                 evidence.update(timestamp=stamp.isoformat(),age_seconds=age,
                                 status="FUTURE" if age<0 else "STALE" if age>2 else "WITHIN_2_SECONDS")

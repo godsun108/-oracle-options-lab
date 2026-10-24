@@ -62,7 +62,7 @@ class ProviderTimingTests(unittest.TestCase):
 
     def test_future_missing_and_wrong_units_fail_closed(self):
         t=self.epoch()
-        for bad in (t+1,None,True,"123",t*1000,0):
+        for bad in (t+1,None,True,"123",t*1000000,0):
             with self.subTest(value=bad):
                 self.assertFalse(self.timing(t,bad)["both_sides_within_2_seconds"])
 
@@ -81,6 +81,22 @@ class ProviderTimingTests(unittest.TestCase):
         self.assertFalse(c["executable_fill_verified"])
         self.assertFalse(r["quote_freshness_verified"])
         self.assertIsNone(c["provider_quote_id"])
+
+    def test_millisecond_timestamps_retain_precision_and_units(self):
+        t=self.epoch()
+        r=self.timing(t*1000-500,t*1000-1500)
+        self.assertTrue(r["both_sides_within_2_seconds"])
+        self.assertEqual(r["bid"]["age_seconds"],0.5)
+        self.assertEqual(r["ask"]["age_seconds"],1.5)
+        self.assertEqual(r["bid"]["unit"],"milliseconds")
+
+    def test_actual_production_timestamp_is_stale(self):
+        from research.paco_tradier_chains import timing_evidence
+        r=timing_evidence({"bid_date":1792786499000,"ask_date":1792786499000},
+                          "2026-10-24T22:36:06.747819+00:00")
+        self.assertEqual(r["bid"]["status"],"STALE")
+        self.assertEqual(r["bid"]["timestamp"],"2026-10-23T20:14:59+00:00")
+        self.assertFalse(r["both_sides_within_2_seconds"])
 
     def test_naive_observation_clock_rejected(self):
         from research.paco_tradier_chains import timing_evidence
