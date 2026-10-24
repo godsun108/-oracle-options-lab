@@ -23,7 +23,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   deploy:
-    if: github.ref == 'refs/heads/main' && (github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && (github.event.workflow_run.event == 'schedule' || github.event.workflow_run.event == 'workflow_dispatch')))
+    if: github.ref == 'refs/heads/main' && (github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && (github.event.workflow_run.event == 'schedule' || github.event.workflow_run.event == 'workflow_dispatch' || github.event.workflow_run.event == 'workflow_run') && github.event.workflow_run.head_repository.full_name == github.repository && github.event.workflow_run.head_branch == 'main'))
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -42,9 +42,13 @@ jobs:
       - name: Obtain most recent reviewed production snapshot
         env:
           GH_TOKEN: ${{ github.token }}
+          TRIGGER_RUN_ID: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || '' }}
         run: |
           mkdir -p out/arena-review
-          RUN_ID=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow arena-evidence-review.yml --branch main --status success --limit 30 --json databaseId,event,conclusion,status --jq '[.[] | select(.event == "schedule" or .event == "workflow_dispatch")][0].databaseId // empty')
+          RUN_ID="$TRIGGER_RUN_ID"
+          if [ -z "$RUN_ID" ]; then
+            RUN_ID=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow arena-evidence-review.yml --branch main --status success --limit 30 --json databaseId,event,conclusion,status --jq '[.[] | select(.event == "schedule" or .event == "workflow_dispatch" or .event == "workflow_run")][0].databaseId // empty')
+          fi
           if [ -z "$RUN_ID" ]; then
             echo "No review run yet; publish explicit empty research status"
             exit 0
@@ -58,7 +62,8 @@ jobs:
           assert r["id"] == int(os.environ["RUN_ID"])
           assert r["path"] == ".github/workflows/arena-evidence-review.yml"
           assert r["head_branch"] == "main"
-          assert r["event"] in ("schedule","workflow_dispatch")
+          assert r["event"] in ("schedule","workflow_dispatch","workflow_run")
+          assert r["head_repository"]["full_name"] == os.environ["GITHUB_REPOSITORY"]
           assert r["status"] == "completed" and r["conclusion"] == "success"
           PY
           gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" --name oracle-q-arena-evidence-review --dir out/arena-review
@@ -88,7 +93,7 @@ jobs:
           if test -s out/arena-review/arena-agent-positions.json; then
             cp out/arena-review/arena-agent-positions.json out/arena-agent-positions.json
           else
-            printf '%s\\n' '{"schema":"oracle-q-arena-agent-positions-v1","source_kind":"NO_VERIFIED_AGENT_POSITIONS","price_is_live":false,"orders_enabled":false,"broker_fills_verified":false,"edge_proven":false,"positions":[],"warning":"No reviewed agent positions available."}' > out/arena-agent-positions.json
+            printf '%s\n' '{"schema":"oracle-q-arena-agent-positions-v1","source_kind":"NO_VERIFIED_AGENT_POSITIONS","price_is_live":false,"orders_enabled":false,"broker_fills_verified":false,"edge_proven":false,"positions":[],"warning":"No reviewed agent positions available."}' > out/arena-agent-positions.json
           fi
           python - <<'PY'
           import json
@@ -103,7 +108,7 @@ jobs:
           if test -s out/arena-review/arena-agent-history.json; then
             cp out/arena-review/arena-agent-history.json out/arena-agent-history.json
           else
-            printf '%s\\n' '{"schema":"oracle-q-arena-agent-history-v1","source_kind":"NO_VERIFIED_HISTORY","orders_enabled":false,"price_is_live":false,"broker_fills_verified":false,"edge_proven":false,"history_is_daily":false,"promotion_eligible":false,"agents":[]}' > out/arena-agent-history.json
+            printf '%s\n' '{"schema":"oracle-q-arena-agent-history-v1","source_kind":"NO_VERIFIED_HISTORY","orders_enabled":false,"price_is_live":false,"broker_fills_verified":false,"edge_proven":false,"history_is_daily":false,"promotion_eligible":false,"agents":[]}' > out/arena-agent-history.json
           fi
           python - <<'PY'
           import json
