@@ -28,4 +28,15 @@ class QuoteEvidenceTests(unittest.TestCase):
         r=validate([q(),q()],now_iso=NOW)
         self.assertEqual(len(r["quotes"]),1)
         self.assertEqual(len(r["rejected"]),1)
+
+class StrictQuoteTests(unittest.TestCase):
+    def test_none_identity_and_fractional_liquidity_rejected(self):
+        for field,value in [('provider',None),('provider_quote_id',None),
+                            ('occ_symbol',None),('ask_size',1.9),('bid_size',True)]:
+            with self.subTest(field=field):
+                self.assertEqual(validate([q(**{field:value})],now_iso=NOW)['quotes'],[])
+    def test_nonfinite_age_limit_rejected(self):
+        for value in (float('nan'),float('inf')):
+            with self.assertRaises(ValueError):validate([q()],now_iso=NOW,max_age_seconds=value)
+
 if __name__=="__main__":unittest.main()
