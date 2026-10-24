@@ -27,4 +27,16 @@ class ChainTests(unittest.TestCase):
     def test_rejects_other_underlying(self):
         with self.assertRaises(ValueError):
             fetch_chain("QQQ","2026-11-13","fixture-token",opener=fake)
+
+class NonfiniteChainTests(unittest.TestCase):
+    def test_nonfinite_quotes_never_enter_snapshots(self):
+        for price in (float('nan'),float('inf'),-float('inf')):
+            def opener(req,timeout):
+                return Response(json.dumps({'options':{'option':{
+                    'symbol':'SPY261113P00600000','option_type':'put',
+                    'bid':price,'ask':2,'bidsize':1,'asksize':1}}}).encode())
+            with self.subTest(price=price):
+                r=fetch_chain('SPY','2026-11-13','fixture',opener=opener)
+                self.assertEqual(r['contracts'],[])
+
 if __name__=="__main__":unittest.main()
