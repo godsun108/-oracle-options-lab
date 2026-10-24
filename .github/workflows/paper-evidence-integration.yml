@@ -1,0 +1,70 @@
+name: Paper integration evidence (no automatic orders)
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'research/paco_session_collection.py'
+      - 'research/paco_history_archive.py'
+      - 'research/tradier_sandbox_execution.py'
+      - 'tests/test_paper_evidence_integration.py'
+      - '.github/workflows/paper-evidence-integration.yml'
+  pull_request:
+    paths:
+      - 'research/paco_session_collection.py'
+      - 'research/paco_history_archive.py'
+      - 'research/tradier_sandbox_execution.py'
+      - 'tests/test_paper_evidence_integration.py'
+      - '.github/workflows/paper-evidence-integration.yml'
+  schedule:
+    - cron: '35 13,14 * * 1-5'
+    - cron: '45 19,20 * * 1-5'
+    - cron: '15 10 * * 0'
+permissions:
+  contents: read
+concurrency:
+  group: paper-integration-evidence
+  cancel-in-progress: false
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m unittest tests.test_paper_evidence_integration -v
+  evidence:
+    if: github.event_name != 'pull_request'
+    needs: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Collect only during the open cash session
+        env:
+          TRADIER_TOKEN: ${{ secrets.TRADIER_TOKEN }}
+        run: python -m research.paco_session_collection --output paco_session_collection.json
+      - name: Archive SPX in bounded date windows
+        if: github.event_name != 'schedule' || github.event.schedule == '15 10 * * 0'
+        env:
+          TRADIER_TOKEN: ${{ secrets.TRADIER_TOKEN }}
+        run: python -m research.paco_history_archive --output paco_history_archive.json
+      - name: Read-only sandbox account preflight
+        if: always()
+        env:
+          TRADIER_SANDBOX_TOKEN: ${{ secrets.TRADIER_SANDBOX_TOKEN }}
+          TRADIER_SANDBOX_ACCOUNT_ID: ${{ secrets.TRADIER_SANDBOX_ACCOUNT_ID }}
+        run: python -m research.tradier_sandbox_execution --output sandbox_preflight.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: paper-integration-evidence-${{ github.run_id }}
+          retention-days: 30
+          path: |
+            paco_session_collection.json
+            paco_history_archive.json
+            sandbox_preflight.json
