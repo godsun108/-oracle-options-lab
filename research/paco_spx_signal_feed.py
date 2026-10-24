@@ -6,32 +6,47 @@ import os
 import urllib.error
 from datetime import date,datetime,timezone
 from pathlib import Path
-from research.multi_market_observer import eligible_cutoff,request_history
+from research.multi_market_observer import request_history
+from research.edge_session_calendar import eligible_cutoff
 from research.spx_ath_spy_puts import signal
 
 def produce(token,collection,*,fetch=request_history,now=None):
     output={"schema":"paco-spx-signal-evidence-v1","orders_enabled":False,
             "status":"SIGNAL_EVIDENCE_UNAVAILABLE","spx_record_close":False,
+            "history_coverage_complete_verified":False,
             "candidates":[],"performance_established":False,
             "warning":"SPX history coverage may not establish an all-time record; no trades inferred."}
     if not token or collection.get("status")!="COLLECTED" or collection.get("orders_enabled") is not False:
         return output
-    cutoff=eligible_cutoff(now)
     # The signal date must predate option entry observation, so never use today's incomplete close.
     try:
+        cutoff=eligible_cutoff(now)
+        output["expected_history_last_date"]=cutoff.isoformat()
         rows=fetch("SPX",token,"1950-01-01",cutoff.isoformat())
+        if not isinstance(rows,list):raise ValueError("history must be a list")
         bars={}
         for row in rows:
             d=date.fromisoformat(str(row["date"])[:10])
+            if d>cutoff:
+                continue
+            if d.weekday()>=5 or d.isoformat() in bars or isinstance(row["close"],bool):
+                raise ValueError("invalid or duplicate history session")
             close=float(row["close"])
-            if d<=cutoff and math.isfinite(close) and close>0:
-                bars[d.isoformat()]=close
+            if not math.isfinite(close) or close<=0:
+                raise ValueError("invalid historical close")
+            bars[d.isoformat()]=close
         ordered=[{"date":d,"close":v} for d,v in sorted(bars.items())]
         if len(ordered)<252:
             output["status"]="INSUFFICIENT_HISTORY"
             return output
         last=ordered[-1]["date"]
-        entry=str(collection.get("collected_at",""))[:10]
+        output["history_last_date"]=last
+        if last!=cutoff.isoformat():
+            output["status"]="STALE_SPX_HISTORY"
+            return output
+        observed=datetime.fromisoformat(collection["collected_at"])
+        if observed.tzinfo is None:raise ValueError("naive collection timestamp")
+        entry=observed.astimezone(timezone.utc).date().isoformat()
         if not entry or last>=entry:
             output["status"]="SIGNAL_DATE_NOT_PRIOR_TO_ENTRY"
             return output
