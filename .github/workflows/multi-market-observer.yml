@@ -49,6 +49,13 @@ on:
       - "tests/test_paco_oracle_pipeline.py"
       - "research/cash_progress_report.py"
       - "tests/test_cash_progress_report.py"
+      - "research/markets_now.py"
+      - "tests/test_markets_now.py"
+      - "tests/check_markets_now_html.mjs"
+      - "markets-now/**"
+      - ".github/workflows/markets-now-tests.yml"
+      - ".github/workflows/markets-now-live.yml"
+      - ".github/workflows/arena-pages.yml"
       - "research/options_discount_scanner.py"
       - "tests/test_options_discount_scanner.py"
       - "research/paco_terminator.py"
@@ -165,6 +172,10 @@ jobs:
         run: python -m unittest tests.test_tradier_paper_bridge -v
       - name: Validate Tradier daily bar fixtures
         run: python -m unittest tests.test_tradier_daily_bars -v
+      - name: Test Markets Now scanner
+        run: python -m unittest tests.test_markets_now -v
+      - name: Validate Markets Now dashboard script
+        run: node tests/check_markets_now_html.mjs
       - name: Offline guardrail tests
         run: python -m unittest discover -s tests -p 'test_*market*.py' -v && python -m unittest discover -s tests -p 'test_daily_focus.py' -v && python -m unittest discover -s tests -p 'test_conditional_paper.py' -v && python -m unittest discover -s tests -p 'test_paper_ledger.py' -v && python -m unittest discover -s tests -p 'test_paper_research_runner.py' -v && python -m unittest discover -s tests -p 'test_opportunity_dispatch.py' -v && python -m unittest discover -s tests -p 'test_dispatch_outbox.py' -v && python -m unittest discover -s tests -p 'test_forward_paper.py' -v && python -m unittest discover -s tests -p 'test_persistent_forward_runner.py' -v && python -m unittest discover -s tests -p 'test_paper_state_snapshot.py' -v
 
