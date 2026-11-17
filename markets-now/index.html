@@ -172,4 +172,5 @@ $('save-trade').addEventListener('click',()=>{const symbol=$('j-symbol').value.t
 $('clear-journal').addEventListener('click',()=>{if(confirm('Clear all journal entries saved on this device?')){localStorage.removeItem(JOURNAL_KEY);journalRender()}});
 $('refresh').addEventListener('click',loadSnapshot);journalRender();loadSnapshot();
 </script>
+<script src="./intelligence.js"></script>
 </body></html>
