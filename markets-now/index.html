@@ -52,7 +52,7 @@ footer{padding:22px 0 0;color:var(--muted);font-size:11px;line-height:1.6}
 <div class="panel"><h2>Trading playbook</h2><p class="muted small">Use this as a repeatable process. No indicator or flow signal guarantees an outcome.</p>
 <div class="playbook">
 <article class="lesson"><h3>Market direction</h3><p>Study SPY, QQQ, IWM, and DIA. Compare price with 20- and 50-day averages, previous highs/lows, and the broader trend. Do not force a trade in a mixed market.</p></article>
-<article class="lesson"><h3>VWAP & volume</h3><p>VWAP is a useful intraday reference. Compare current volume with normal activity. A breakout without participation may fail. Markets Now's initial scanner does not yet calculate intraday VWAP.</p></article>
+<article class="lesson"><h3>VWAP, 9 EMA & volume</h3><p>VWAP is a useful intraday reference; the 9 EMA can help visualize short-term trend. Compare volume with normal activity. A breakout without participation may fail. Markets Now's initial scanner does not yet calculate intraday VWAP or 9 EMA.</p></article>
 <article class="lesson"><h3>RSI & MACD</h3><p>RSI helps describe momentum and potential overbought/oversold conditions; MACD helps study momentum shifts. Neither is a standalone entry signal. RSI 14 is displayed when enough daily bars are available.</p></article>
 <article class="lesson"><h3>Support & resistance</h3><p>Mark prior-day high/low, premarket high/low, prior close, and major price zones. Wait for a breakout and a convincing retest rather than chasing a large candle.</p></article>
 <article class="lesson"><h3>Options liquidity</h3><p>Check bid/ask width, displayed size, volume, and open interest. A cheap premium is not automatically a bargain. Avoid contracts with poor liquidity or wide spreads.</p></article>
@@ -61,12 +61,14 @@ footer{padding:22px 0 0;color:var(--muted);font-size:11px;line-height:1.6}
 <article class="lesson"><h3>VIX & macro calendar</h3><p>Watch VIX, Fed decisions, CPI, PCE, payrolls, unemployment, and GDP. Event risk can change spreads, volatility, and option prices quickly.</p></article>
 <article class="lesson"><h3>Calls, puts & inverse ETFs</h3><p>Calls can express bullish views; puts can express bearish views. Inverse ETFs target opposite daily index returns and can diverge over longer periods because of daily resets. Options on leveraged ETFs add risk.</p></article>
 <article class="lesson"><h3>Opening range breakout</h3><p>Mark the first 15–30 minutes' high and low. Watch for a break with volume and a successful retest. Paper trade it before risking capital.</p></article>
-<article class="lesson"><h3>Unusual options activity</h3><p>Unusual volume or large prints can be hedges, spreads, or closing trades. Volume above open interest is a clue to investigate, not proof of insider knowledge or direction.</p></article>
+<article class="lesson"><h3>Unusual options activity & put/call ratio</h3><p>Unusual volume, large prints, and the put/call ratio can reveal positioning worth investigating. Trades may be hedges, spreads, or closing transactions—not proof of insider knowledge or future direction.</p></article>
 <article class="lesson"><h3>Expected move & GEX</h3><p>Expected move is inferred from option prices; gamma exposure estimates how dealer hedging may influence price behavior. Both require careful sourcing and interpretation.</p></article>
 <article class="lesson"><h3>Exit before entry</h3><p>Write down invalidation, maximum loss, profit-taking plan, and position size before entering. Stops on options may slip or fail to execute at the intended price.</p></article>
 <article class="lesson"><h3>Never average down blindly</h3><p>Adding to a losing option increases exposure. Only add when the original thesis and total risk budget still justify it. Do not chase losses or trade from FOMO.</p></article>
 <article class="lesson"><h3>Expiration discipline</h3><p>Start by studying 30–60 DTE contracts. Avoid 0DTE while learning. Time decay accelerates near expiration, and short-dated options can lose their entire premium.</p></article>
 <article class="lesson"><h3>Paper trade & review</h3><p>Log at least 30–50 paper trades. Compare results after fees and realistic bid/ask execution. Review expectancy, drawdown, win rate, and rule adherence—not just the biggest winner.</p></article>
+<article class="lesson"><h3>Position sizing & risk budget</h3><p>Set the maximum dollar loss before entry. For a long option, one contract can lose its entire premium × 100 plus fees; size contracts so the full loss fits your risk budget. A conservative learning rule is to consider risking no more than 1% of the account on one trade.</p></article>
+<article class="lesson"><h3>Risk/reward & no-trade days</h3><p>Define the invalidation level, exit plan, and realistic profit target before entry. Skip trades with poor reward relative to risk, unclear market direction, stale quotes, or an event you do not understand. Cash is a position.</p></article>
 </div></div>
 <div class="panel"><h2>Pre-trade checklist</h2><div class="checklist" id="checklist">
 <label class="check"><input type="checkbox"> I know the market regime and trend.</label>
@@ -76,6 +78,7 @@ footer{padding:22px 0 0;color:var(--muted);font-size:11px;line-height:1.6}
 <label class="check"><input type="checkbox"> The bid/ask spread and quote time are acceptable.</label>
 <label class="check"><input type="checkbox"> I understand delta, theta, IV, and expiration.</label>
 <label class="check"><input type="checkbox"> I know the maximum loss before entry.</label>
+<label class="check"><input type="checkbox"> Position size fits my risk budget (consider 1% max while learning).</label>
 <label class="check"><input type="checkbox"> The trade fits my written plan — no FOMO.</label>
 <label class="check"><input type="checkbox"> I have a defined exit and invalidation point.</label>
 <label class="check"><input type="checkbox"> I can afford to lose the full premium.</label>
