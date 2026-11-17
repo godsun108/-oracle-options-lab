@@ -13,7 +13,6 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-import requests
 
 BASE = "https://api.tradier.com/v1"
 EASTERN = ZoneInfo("America/New_York")
@@ -231,7 +230,12 @@ def collect(token: str | None = None, *, session=None, now: datetime | None = No
     token = token or os.getenv("TRADIER_TOKEN")
     if not token:
         return empty_snapshot(now, "TRADIER_TOKEN is not configured in GitHub Actions secrets.")
-    session = session or requests.Session()
+    if session is None:
+        try:
+            import requests
+        except ImportError:
+            return empty_snapshot(now, "The requests dependency is not installed in the scanner environment.")
+        session = requests.Session()
     try:
         quote_payload = _get(session, token, "/markets/quotes", {"symbols": ",".join(WATCHLIST), "greeks": "false"})
         quotes = _rows(quote_payload, "quotes", "quote")
