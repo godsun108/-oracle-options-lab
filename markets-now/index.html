@@ -44,7 +44,7 @@ footer{padding:22px 0 0;color:var(--muted);font-size:11px;line-height:1.6}
 </section>
 
 <section class="section" id="watchlist">
-<div class="panel"><div class="panelhead"><h2>Your market watchlist</h2><span class="pill">30 symbols</span></div><p class="muted small">Leveraged inverse and leveraged ETFs are visible for context but excluded from the initial options scan.</p><div class="watchgrid" id="watch-grid"><div class="empty">Waiting for feed.</div></div></div>
+<div class="panel"><div class="panelhead"><h2>Your market watchlist</h2><span class="pill">29 symbols</span></div><p class="muted small">Leveraged inverse and leveraged ETFs are visible for context but excluded from the initial options scan.</p><div class="watchgrid" id="watch-grid"><div class="empty">Waiting for feed.</div></div></div>
 <div class="panel"><h2>Scanner coverage</h2><div class="tablewrap"><table><thead><tr><th>Underlying</th><th>Status</th><th>Trend</th><th>RSI 14</th><th>5-day return</th><th>Contracts reviewed</th></tr></thead><tbody id="coverage"><tr><td colspan="6">Waiting for feed.</td></tr></tbody></table></div></div>
 </section>
 
@@ -114,7 +114,7 @@ function renderCandidate(c){
  const title=document.createElement('div');const strong=document.createElement('strong');strong.textContent=c.underlying+' '+c.type;const sub=document.createElement('div');sub.className='muted small';sub.textContent=c.contract||'Contract symbol unavailable';title.append(strong,sub);
  const score=document.createElement('div');score.className='score';score.textContent=String(c.screen_score)+'/100';head.append(title,score);el.append(head);
  const grid=document.createElement('div');grid.className='candidategrid';
- for(const [label,value] of [['Strike',money(c.strike)],['Bid / Ask',money(c.bid)+' / '+money(c.ask)],['DTE',c.dte],['Spread',Number(c.spread_pct).toFixed(1)+'%'],['Delta',c.delta===null?'—':Number(c.delta).toFixed(2)],['IV',c.iv===null?'—':Number(c.iv).toFixed(3)],['Volume',c.volume],['Open int.',c.open_interest]]){const cell=document.createElement('div'),small=document.createElement('small'),b=document.createElement('b');small.textContent=label;b.textContent=value;cell.append(small,b);grid.append(cell)}
+ for(const [label,value] of [['Strike',money(c.strike)],['Bid / Ask',money(c.bid)+' / '+money(c.ask)],['DTE',c.dte],['Spread',Number(c.spread_pct).toFixed(1)+'%'],['Delta',c.delta===null?'—':Number(c.delta).toFixed(2)],['IV',c.iv===null?'—':(Number(c.iv)<=1?(Number(c.iv)*100).toFixed(1):Number(c.iv).toFixed(1))+'%'],['Volume',c.volume],['Open int.',c.open_interest]]){const cell=document.createElement('div'),small=document.createElement('small'),b=document.createElement('b');small.textContent=label;b.textContent=value;cell.append(small,b);grid.append(cell)}
  el.append(grid);
  const p=document.createElement('p');p.textContent=c.expiration+' · '+c.directional_fit+' · '+(c.quote_timestamp_verified?'Provider quote time verified':'Provider quote time not verified; check broker chain');el.append(p);
  const reasons=document.createElement('div');reasons.className='reasonlist';(c.reasons||[]).forEach(x=>{const tag=document.createElement('span');tag.className='reason';tag.textContent=x;reasons.append(tag)});el.append(reasons);
@@ -145,7 +145,8 @@ function render(){
   $('best-note').textContent=s.warning||'The screen found no candidate above the minimum score, or current data is unavailable.';
  }
  const box=$('candidates');box.replaceChildren();
- if(candidates.length){candidates.forEach(c=>box.append(renderCandidate(c)))}
+ if(!fresh){const empty=document.createElement('div');empty.className='empty';empty.textContent='Snapshot is stale. Candidate rankings are hidden until a fresh scan is published.';box.append(empty)}
+ else if(candidates.length){candidates.forEach(c=>box.append(renderCandidate(c)))}
  else{const empty=document.createElement('div');empty.className='empty';empty.textContent='No candidates returned. No trade is a valid result.';box.append(empty)}
  const pulse=$('pulse');pulse.replaceChildren();
  watch.forEach(x=>{const tr=document.createElement('tr');const vals=[x.symbol,money(x.last),pct(x.change_pct),Number(x.volume||0).toLocaleString(),x.scan_enabled?'SCANNED':'WATCH ONLY'];vals.forEach((v,i)=>{const td=document.createElement('td');td.textContent=v;if(i===2)td.className=Number(x.change_pct)>0?'up':Number(x.change_pct)<0?'down':'neutral';tr.append(td)});pulse.append(tr)});
