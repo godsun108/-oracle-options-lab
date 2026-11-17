@@ -46,7 +46,7 @@ jobs:
       - name: Obtain most recent reviewed production snapshot
         env:
           GH_TOKEN: ${{ github.token }}
-          TRIGGER_RUN_ID: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || '' }}
+          TRIGGER_RUN_ID: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.name == 'Oracle-Q Arena Evidence Review' && github.event.workflow_run.id || '' }}
         run: |
           mkdir -p out/arena-review
           RUN_ID="$TRIGGER_RUN_ID"
@@ -177,7 +177,7 @@ jobs:
           cp out/arena-agent-positions.json _site/arena/arena-agent-positions.json
           cp out/arena-agent-history.json _site/arena/arena-agent-history.json
           cp out/arena-paper-delta.json _site/arena/arena-paper-delta.json
-          printf '<!doctype html><meta http-equiv="refresh" content="0; url=./arena/"><a href="./arena/">Oracle-Q Arena</a>\n' > _site/index.html
+          printf '<!doctype html><meta http-equiv="refresh" content="0; url=./markets-now/"><a href="./markets-now/">Markets Now</a> · <a href="./arena/">Oracle-Q Arena</a>\n' > _site/index.html
           printf 'Oracle-Q Arena is a research-only spectator preview. No verified live trading feed is connected.\n' > _site/arena/STATUS.txt
       - uses: actions/upload-pages-artifact@v3
         with:
