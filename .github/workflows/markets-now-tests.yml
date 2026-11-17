@@ -4,6 +4,7 @@ on:
     paths:
       - 'research/markets_now.py'
       - 'tests/test_markets_now.py'
+      - 'tests/check_markets_now_html.mjs'
       - 'markets-now/**'
       - '.github/workflows/markets-now-tests.yml'
   push:
@@ -11,6 +12,7 @@ on:
     paths:
       - 'research/markets_now.py'
       - 'tests/test_markets_now.py'
+      - 'tests/check_markets_now_html.mjs'
       - 'markets-now/**'
       - '.github/workflows/markets-now-tests.yml'
 permissions:
