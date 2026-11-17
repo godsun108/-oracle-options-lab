@@ -1,0 +1,35 @@
+name: Markets Now Read-only Scanner
+on:
+  workflow_dispatch:
+  schedule:
+    # UTC schedule spans the US cash session in both daylight and standard time.
+    # The collector labels the session using America/New_York.
+    - cron: '*/15 13-21 * * 1-5'
+permissions:
+  contents: read
+concurrency:
+  group: markets-now-readonly-scan
+  cancel-in-progress: false
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install read-only market-data dependency
+        run: python -m pip install requests
+      - name: Run scanner safety tests
+        run: python -m unittest tests.test_markets_now -v
+      - name: Collect read-only market and options snapshot
+        env:
+          TRADIER_TOKEN: ${{ secrets.TRADIER_TOKEN }}
+        run: python research/markets_now.py --output out/markets-now.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: markets-now-snapshot
+          path: out/markets-now.json
+          if-no-files-found: error
+          retention-days: 14
