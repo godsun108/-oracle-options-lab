@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -14,6 +15,7 @@ SYMBOLS = ("SPY", "QQQ", "IWM", "SMH", "TLT", "GLD")
 EASTERN = ZoneInfo("America/New_York")
 BASE = "https://api.tradier.com/v1"
 MIN_BARS = 200
+MAX_FETCH_ATTEMPTS = 3
 
 
 def eligible_cutoff(now=None):
@@ -71,12 +73,22 @@ def collect(token, now=None, fetch=request_history):
     start = (cutoff - dt.timedelta(days=850)).isoformat()
     results = []
     for symbol in SYMBOLS:
-        try:
-            rows = fetch(symbol, token, start, cutoff.isoformat())
-            results.append(summarize(symbol, rows, cutoff))
-        except (urllib.error.URLError, TimeoutError, ValueError, KeyError, TypeError) as exc:
-            results.append({"symbol": symbol, "status": "DATA_ERROR",
-                            "error_type": type(exc).__name__, "signal": None})
+        result = None
+        for attempt in range(1, MAX_FETCH_ATTEMPTS + 1):
+            try:
+                rows = fetch(symbol, token, start, cutoff.isoformat())
+                result = summarize(symbol, rows, cutoff)
+                result["attempts"] = attempt
+                if result["status"] == "OBSERVATION_ONLY":
+                    break
+            except (urllib.error.URLError, TimeoutError, ValueError, KeyError, TypeError) as exc:
+                result = {"symbol": symbol, "status": "DATA_ERROR",
+                          "error_type": type(exc).__name__, "signal": None,
+                          "attempts": attempt}
+            if attempt < MAX_FETCH_ATTEMPTS:
+                # Retry bounded transient empty/short responses without hiding final gaps.
+                time.sleep(0.25 * attempt)
+        results.append(result)
     payload = {"schema": "oracle-q-multi-market-observation-v1",
                "cutoff": cutoff.isoformat(), "research_only": True,
                "orders_enabled": False, "strategies_enabled": False,
@@ -99,6 +111,11 @@ def main():
         stream.write("\n")
     failures = [r for r in payload["results"] if r["status"] != "OBSERVATION_ONLY"]
     print("Observed", len(payload["results"]), "markets; unavailable/insufficient:", len(failures))
+    if failures:
+        print("Unverified markets:", ", ".join(
+            f'{r["symbol"]} ({r["status"]}, {r.get("bars", 0)} bars, {r.get("attempts", 0)} attempts)'
+            for r in failures
+        ))
     return 1 if failures else 0
 
 
