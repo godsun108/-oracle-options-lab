@@ -96,7 +96,7 @@ jobs:
             gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" --name markets-now-snapshot --dir out/markets-now
           fi
           if ! test -s out/markets-now/markets-now.json; then
-            printf '%s\\n' '{"schema":"markets-now-snapshot-v1","generated_at_utc":null,"market_session":"UNKNOWN","provider":"tradier","feed_status":"UNAVAILABLE","watchlist":[],"candidates":[],"best_candidate":null,"orders_enabled":false,"research_only":true,"edge_proven":false,"warning":"No successful Markets Now snapshot is available yet."}' > out/markets-now/markets-now.json
+            printf '%s\n' '{"schema":"markets-now-snapshot-v1","generated_at_utc":null,"market_session":"UNKNOWN","provider":"tradier","feed_status":"UNAVAILABLE","watchlist":[],"candidates":[],"best_candidate":null,"orders_enabled":false,"research_only":true,"edge_proven":false,"warning":"No successful Markets Now snapshot is available yet."}' > out/markets-now/markets-now.json
           fi
       - name: Project audited progress, or retain empty feed
         run: |
