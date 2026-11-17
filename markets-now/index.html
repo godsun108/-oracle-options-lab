@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0a1020">
+<title>Markets Now | Oracle-Q</title>
+<style>
+:root{color-scheme:dark;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#080e1a;color:#edf3ff;--panel:#111c2e;--panel2:#0d1728;--line:#263751;--muted:#9fb0c9;--blue:#8ec8ff;--green:#79d6ad;--red:#ff9b9b;--amber:#f4c978}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#0b1424 0,#080e1a 360px);min-height:100vh}a{color:var(--blue)}button,input,select{font:inherit}button{cursor:pointer;color:inherit;background:#1b3150;border:1px solid #36577f;border-radius:11px;padding:10px 13px}button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--blue);outline-offset:3px}
+main{max-width:1160px;margin:auto;padding:20px 16px 48px}.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.brand{font-weight:800;letter-spacing:.07em}.topnav{display:flex;gap:7px;flex-wrap:wrap}.topnav button{font-size:13px;padding:8px 11px;background:transparent;border-color:var(--line);color:var(--muted)}.topnav button.active{background:#203b5d;color:white;border-color:#4b729e}
+h1{font-size:clamp(32px,6vw,52px);line-height:1.04;margin:28px 0 7px;letter-spacing:-.04em}.sub{color:var(--muted);margin:0;line-height:1.5}.statusrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:18px 0}.pill{border:1px solid var(--line);border-radius:99px;padding:6px 10px;font-size:12px;color:#c9d8ed;background:#101b2d}.pill.good{border-color:#28654f;color:#9de2c3}.pill.warn{border-color:#775d30;color:#f5d38e}.pill.bad{border-color:#754348;color:#ffb5b5}
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:16px 0}.panel,.metric{background:linear-gradient(145deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:17px;padding:17px;min-width:0}.metric small,.eyebrow{display:block;color:var(--muted);font-size:11px;letter-spacing:.08em;text-transform:uppercase}.metric strong{display:block;font-size:25px;margin:8px 0 3px;font-variant-numeric:tabular-nums}.metric span{font-size:12px;color:var(--muted)}.panel{margin:14px 0}.panelhead{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.panel h2{font-size:18px;margin:0 0 10px}.panelhead h2{margin:0}.muted{color:var(--muted)}.small{font-size:12px;line-height:1.5}.hero{border-color:#38587e;background:radial-gradient(ellipse at 90% 0,#1b3b60 0,transparent 55%),var(--panel)}.hero h2{font-size:21px}.hero .contract{font-size:clamp(20px,4vw,30px);font-weight:800;margin:7px 0}.hero .details{display:flex;gap:16px;flex-wrap:wrap;margin:13px 0}.detail b{display:block;font-size:17px}.detail small{color:var(--muted);font-size:11px}.reasonlist{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}.reason{font-size:11px;padding:5px 8px;border-radius:8px;background:#1c2d45;color:#cbd9ed}.disclaimer{border-left:3px solid var(--amber);padding:10px 12px;background:#1c1a17;color:#e9d8b6;border-radius:0 9px 9px 0;font-size:12px;line-height:1.55}
+.cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.candidate{border:1px solid var(--line);background:#0d1829;border-radius:14px;padding:14px;min-width:0}.candidatehead{display:flex;justify-content:space-between;gap:8px;align-items:start}.candidate strong{font-size:16px}.score{font-size:18px;font-weight:800;color:#b8d9ff}.candidategrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}.candidategrid small{display:block;font-size:10px;color:var(--muted)}.candidategrid b{font-size:14px;font-variant-numeric:tabular-nums}.candidate p{margin:7px 0 0;font-size:12px;color:var(--muted);line-height:1.45}
+.tablewrap{overflow:auto}table{border-collapse:collapse;width:100%;min-width:700px}th,td{text-align:left;border-bottom:1px solid var(--line);padding:11px 9px;font-size:12px;white-space:nowrap}th{color:var(--muted);font-weight:600;text-transform:uppercase;font-size:10px;letter-spacing:.06em}td b{font-size:13px}.up{color:var(--green)}.down{color:var(--red)}.neutral{color:var(--amber)}
+.section{display:none}.section.active{display:block}.watchgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.watch{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:11px;border:1px solid var(--line);border-radius:11px;background:#0d1829}.watch b{font-size:13px}.watch small{display:block;color:var(--muted);font-size:10px;margin-top:3px}.watch .price{text-align:right;font-variant-numeric:tabular-nums;font-size:12px}
+.playbook{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.lesson{border:1px solid var(--line);border-radius:13px;padding:13px;background:#0d1829}.lesson h3{margin:0 0 7px;font-size:14px}.lesson p{margin:0;color:var(--muted);font-size:12px;line-height:1.5}
+.checklist{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.check{display:flex;gap:9px;align-items:start;font-size:13px;line-height:1.4}.check input{margin-top:3px;accent-color:#8ec8ff}
+.formgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}.field label{display:block;color:var(--muted);font-size:11px;margin-bottom:5px}.field input,.field select{width:100%;background:#081321;border:1px solid var(--line);border-radius:9px;padding:10px;color:white}.journalrow{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end}.journalitems{display:grid;gap:8px;margin-top:12px}.journalitem{border:1px solid var(--line);border-radius:11px;padding:11px;font-size:12px;display:flex;justify-content:space-between;gap:12px}.empty{border:1px dashed #40536d;border-radius:12px;padding:18px;color:var(--muted);font-size:13px;text-align:center}
+footer{padding:22px 0 0;color:var(--muted);font-size:11px;line-height:1.6}
+@media(max-width:760px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.cards{grid-template-columns:1fr}.watchgrid{grid-template-columns:repeat(2,minmax(0,1fr))}.candidategrid{grid-template-columns:repeat(4,1fr)}}
+@media(max-width:480px){main{padding:15px 12px 38px}.panel,.metric{padding:13px;border-radius:14px}.grid{gap:8px}.metric strong{font-size:21px}.topnav{width:100%;display:grid;grid-template-columns:repeat(4,1fr)}.topnav button{padding:8px 4px;font-size:11px}.watchgrid{grid-template-columns:1fr 1fr}.playbook,.checklist{grid-template-columns:1fr}.formgrid{grid-template-columns:1fr 1fr}.journalrow{grid-template-columns:1fr}.candidategrid{gap:5px}.candidategrid b{font-size:12px}}
+</style>
+</head>
+<body>
+<main>
+<header class="top"><div class="brand">◈ ORACLE-Q / MARKETS NOW</div><div class="topnav" role="navigation" aria-label="Markets Now sections">
+<button class="active" data-tab="overview">Overview</button><button data-tab="watchlist">Watchlist</button><button data-tab="playbook">Playbook</button><button data-tab="journal">Journal</button>
+</div></header>
+<h1>Markets Now</h1><p class="sub">Market conditions, options research candidates, and your trading discipline — in one place.</p>
+<div class="statusrow"><span class="pill warn" id="feed-status">WAITING FOR SNAPSHOT</span><span class="pill" id="session">SESSION —</span><span class="pill" id="updated">Updated —</span><button id="refresh" type="button">Refresh snapshot</button></div>
+
+<section class="section active" id="overview">
+<div class="grid">
+<div class="metric"><small>Markets scanned</small><strong id="market-count">—</strong><span>Underlying watchlist</span></div>
+<div class="metric"><small>Option candidates</small><strong id="candidate-count">—</strong><span>Filtered contract ideas</span></div>
+<div class="metric"><small>Top screen score</small><strong id="top-score">—</strong><span>Not probability of profit</span></div>
+<div class="metric"><small>Market breadth</small><strong id="breadth">—</strong><span>SPY / QQQ / IWM / DIA</span></div>
+</div>
+<div class="panel hero" id="best-panel"><div class="eyebrow">Top research candidate</div><h2 id="best-title">Waiting for verified market data</h2><p class="muted small" id="best-note">No candidate will be invented if the feed is unavailable or the screening rules find no suitable contract.</p><div id="best-body"></div></div>
+<div class="panel"><div class="panelhead"><h2>Options shortlist</h2><span class="pill">30–60 DTE · no 0DTE</span></div><p class="muted small">Ranked by a transparent liquidity, spread, delta, expiration, and trend-alignment screen. This is a research shortlist, not a trade recommendation.</p><div class="cards" id="candidates"><div class="empty">No market snapshot loaded.</div></div></div>
+<div class="panel"><div class="panelhead"><h2>Market pulse</h2><span class="muted small">Underlying price snapshot</span></div><div class="tablewrap"><table><thead><tr><th>Symbol</th><th>Last</th><th>Change</th><th>Volume</th><th>Scan</th></tr></thead><tbody id="pulse"><tr><td colspan="5">Waiting for feed.</td></tr></tbody></table></div></div>
+<div class="disclaimer">Research only. Markets Now does not predict guaranteed winners, place orders, or know your personal financial circumstances. Confirm the live contract, bid/ask, quote time, IV, Greeks, event calendar, and maximum loss in your brokerage platform before making any decision. A missing or stale feed means no actionable setup.</div>
+</section>
+
+<section class="section" id="watchlist">
+<div class="panel"><div class="panelhead"><h2>Your market watchlist</h2><span class="pill">30 symbols</span></div><p class="muted small">Leveraged inverse and leveraged ETFs are visible for context but excluded from the initial options scan.</p><div class="watchgrid" id="watch-grid"><div class="empty">Waiting for feed.</div></div></div>
+<div class="panel"><h2>Scanner coverage</h2><div class="tablewrap"><table><thead><tr><th>Underlying</th><th>Status</th><th>Trend</th><th>RSI 14</th><th>5-day return</th><th>Contracts reviewed</th></tr></thead><tbody id="coverage"><tr><td colspan="6">Waiting for feed.</td></tr></tbody></table></div></div>
+</section>
+
+<section class="section" id="playbook">
+<div class="panel"><h2>Trading playbook</h2><p class="muted small">Use this as a repeatable process. No indicator or flow signal guarantees an outcome.</p>
+<div class="playbook">
+<article class="lesson"><h3>Market direction</h3><p>Study SPY, QQQ, IWM, and DIA. Compare price with 20- and 50-day averages, previous highs/lows, and the broader trend. Do not force a trade in a mixed market.</p></article>
+<article class="lesson"><h3>VWAP & volume</h3><p>VWAP is a useful intraday reference. Compare current volume with normal activity. A breakout without participation may fail. Markets Now's initial scanner does not yet calculate intraday VWAP.</p></article>
+<article class="lesson"><h3>RSI & MACD</h3><p>RSI helps describe momentum and potential overbought/oversold conditions; MACD helps study momentum shifts. Neither is a standalone entry signal. RSI 14 is displayed when enough daily bars are available.</p></article>
+<article class="lesson"><h3>Support & resistance</h3><p>Mark prior-day high/low, premarket high/low, prior close, and major price zones. Wait for a breakout and a convincing retest rather than chasing a large candle.</p></article>
+<article class="lesson"><h3>Options liquidity</h3><p>Check bid/ask width, displayed size, volume, and open interest. A cheap premium is not automatically a bargain. Avoid contracts with poor liquidity or wide spreads.</p></article>
+<article class="lesson"><h3>The Greeks</h3><p>Delta: price sensitivity. Gamma: delta's rate of change. Theta: time decay. Vega: implied-volatility sensitivity. Rho: interest-rate sensitivity. Buyers can lose premium as time passes.</p></article>
+<article class="lesson"><h3>Implied volatility</h3><p>High IV can make options expensive. Earnings and major announcements can cause IV crush: the option can lose value even when the underlying moves in your direction. Check IV rank/percentile where available.</p></article>
+<article class="lesson"><h3>VIX & macro calendar</h3><p>Watch VIX, Fed decisions, CPI, PCE, payrolls, unemployment, and GDP. Event risk can change spreads, volatility, and option prices quickly.</p></article>
+<article class="lesson"><h3>Calls, puts & inverse ETFs</h3><p>Calls can express bullish views; puts can express bearish views. Inverse ETFs target opposite daily index returns and can diverge over longer periods because of daily resets. Options on leveraged ETFs add risk.</p></article>
+<article class="lesson"><h3>Opening range breakout</h3><p>Mark the first 15–30 minutes' high and low. Watch for a break with volume and a successful retest. Paper trade it before risking capital.</p></article>
+<article class="lesson"><h3>Unusual options activity</h3><p>Unusual volume or large prints can be hedges, spreads, or closing trades. Volume above open interest is a clue to investigate, not proof of insider knowledge or direction.</p></article>
+<article class="lesson"><h3>Expected move & GEX</h3><p>Expected move is inferred from option prices; gamma exposure estimates how dealer hedging may influence price behavior. Both require careful sourcing and interpretation.</p></article>
+<article class="lesson"><h3>Exit before entry</h3><p>Write down invalidation, maximum loss, profit-taking plan, and position size before entering. Stops on options may slip or fail to execute at the intended price.</p></article>
+<article class="lesson"><h3>Never average down blindly</h3><p>Adding to a losing option increases exposure. Only add when the original thesis and total risk budget still justify it. Do not chase losses or trade from FOMO.</p></article>
+<article class="lesson"><h3>Expiration discipline</h3><p>Start by studying 30–60 DTE contracts. Avoid 0DTE while learning. Time decay accelerates near expiration, and short-dated options can lose their entire premium.</p></article>
+<article class="lesson"><h3>Paper trade & review</h3><p>Log at least 30–50 paper trades. Compare results after fees and realistic bid/ask execution. Review expectancy, drawdown, win rate, and rule adherence—not just the biggest winner.</p></article>
+</div></div>
+<div class="panel"><h2>Pre-trade checklist</h2><div class="checklist" id="checklist">
+<label class="check"><input type="checkbox"> I know the market regime and trend.</label>
+<label class="check"><input type="checkbox"> I checked support, resistance, and volume.</label>
+<label class="check"><input type="checkbox"> I checked the economic and earnings calendar.</label>
+<label class="check"><input type="checkbox"> The option has adequate volume and open interest.</label>
+<label class="check"><input type="checkbox"> The bid/ask spread and quote time are acceptable.</label>
+<label class="check"><input type="checkbox"> I understand delta, theta, IV, and expiration.</label>
+<label class="check"><input type="checkbox"> I know the maximum loss before entry.</label>
+<label class="check"><input type="checkbox"> The trade fits my written plan — no FOMO.</label>
+<label class="check"><input type="checkbox"> I have a defined exit and invalidation point.</label>
+<label class="check"><input type="checkbox"> I can afford to lose the full premium.</label>
+</div></div>
+</section>
+
+<section class="section" id="journal">
+<div class="panel"><h2>Trading journal</h2><p class="muted small">Entries are saved only in this browser on this device. They are not uploaded to GitHub or synced to another device.</p>
+<div class="formgrid">
+<div class="field"><label for="j-symbol">Symbol / contract</label><input id="j-symbol" placeholder="e.g. SPY 600C"></div>
+<div class="field"><label for="j-side">Side</label><select id="j-side"><option>Call</option><option>Put</option><option>Spread</option><option>Paper only</option></select></div>
+<div class="field"><label for="j-exp">Expiration</label><input id="j-exp" type="date"></div>
+<div class="field"><label for="j-entry">Entry premium</label><input id="j-entry" type="number" min="0" step=".01" placeholder="0.00"></div>
+<div class="field"><label for="j-exit">Exit premium</label><input id="j-exit" type="number" min="0" step=".01" placeholder="Optional"></div>
+<div class="field"><label for="j-result">Result / P&L ($)</label><input id="j-result" type="number" step=".01" placeholder="Optional"></div>
+<div class="field" style="grid-column:1/-1"><label for="j-thesis">Thesis, entry reason, exit rule, lesson</label><input id="j-thesis" placeholder="Why this setup? What invalidates it?"></div>
+</div><div class="journalrow" style="margin-top:12px"><span class="muted small">Record paper or live trades consistently. Never include account numbers or passwords.</span><button id="save-trade">Save journal entry</button></div><div class="journalitems" id="journal-items"><div class="empty">No journal entries yet.</div></div><div style="display:flex;justify-content:flex-end;margin-top:10px"><button id="clear-journal" type="button">Clear local journal</button></div>
+</div></section>
+
+<footer>Markets Now · Oracle-Q · Read-only research dashboard. <a href="../arena/">Open the research arena</a> · <a href="https://github.com/godsun108/-oracle-options-lab">Source repository</a><br>Snapshot cadence is scheduled and may be delayed by GitHub Actions or market-data provider availability. “Refresh snapshot” reloads the latest published file; it does not force a new provider scan. This dashboard is not investment advice and has no brokerage order capability.</footer>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const money=n=>Number.isFinite(Number(n))?'$'+Number(n).toFixed(2):'—';
+const pct=n=>Number.isFinite(Number(n))?(Number(n)>0?'+':'')+Number(n).toFixed(2)+'%':'—';
+const safeText=(v)=>v===null||v===undefined?'—':String(v);
+let snapshot=null;
+document.querySelectorAll('[data-tab]').forEach(btn=>btn.addEventListener('click',()=>{
+ document.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('active',x===btn));
+ document.querySelectorAll('.section').forEach(x=>x.classList.toggle('active',x.id===btn.dataset.tab));
+}));
+function statusPill(id,text,kind){const el=$(id);el.textContent=text;el.className='pill'+(kind?' '+kind:'')}
+function renderCandidate(c){
+ const el=document.createElement('article');el.className='candidate';
+ const head=document.createElement('div');head.className='candidatehead';
+ const title=document.createElement('div');const strong=document.createElement('strong');strong.textContent=c.underlying+' '+c.type;const sub=document.createElement('div');sub.className='muted small';sub.textContent=c.contract||'Contract symbol unavailable';title.append(strong,sub);
+ const score=document.createElement('div');score.className='score';score.textContent=String(c.screen_score)+'/100';head.append(title,score);el.append(head);
+ const grid=document.createElement('div');grid.className='candidategrid';
+ for(const [label,value] of [['Strike',money(c.strike)],['Bid / Ask',money(c.bid)+' / '+money(c.ask)],['DTE',c.dte],['Spread',Number(c.spread_pct).toFixed(1)+'%'],['Delta',c.delta===null?'—':Number(c.delta).toFixed(2)],['IV',c.iv===null?'—':Number(c.iv).toFixed(3)],['Volume',c.volume],['Open int.',c.open_interest]]){const cell=document.createElement('div'),small=document.createElement('small'),b=document.createElement('b');small.textContent=label;b.textContent=value;cell.append(small,b);grid.append(cell)}
+ el.append(grid);
+ const p=document.createElement('p');p.textContent=c.expiration+' · '+c.directional_fit+' · '+(c.quote_timestamp_verified?'Provider quote time verified':'Provider quote time not verified; check broker chain');el.append(p);
+ const reasons=document.createElement('div');reasons.className='reasonlist';(c.reasons||[]).forEach(x=>{const tag=document.createElement('span');tag.className='reason';tag.textContent=x;reasons.append(tag)});el.append(reasons);
+ return el;
+}
+function render(){
+ if(!snapshot)return;
+ const s=snapshot;
+ const generated=new Date(s.generated_at_utc);const age=(Date.now()-generated.getTime())/60000;const fresh=Number.isFinite(age)&&age<=20;
+ statusPill('feed-status',s.feed_status==='SNAPSHOT_AVAILABLE'?(fresh?'SNAPSHOT AVAILABLE':'STALE SNAPSHOT'):s.feed_status||'UNAVAILABLE',s.feed_status==='SNAPSHOT_AVAILABLE'&&fresh?'good':'warn');
+ statusPill('session','MARKET '+(s.market_session||'—'));
+ $('updated').textContent='Updated '+(Number.isFinite(generated.getTime())?generated.toLocaleString():'—');
+ const watch=s.watchlist||[];const candidates=s.candidates||[];const qualified=candidates.filter(x=>x.screen_score>=65);
+ $('market-count').textContent=watch.filter(x=>x.quote_available).length+'/'+watch.length;
+ $('candidate-count').textContent=String(s.qualified_candidate_count??qualified.length);
+ $('top-score').textContent=candidates.length?String(candidates[0].screen_score)+'/100':'—';
+ const majors=['SPY','QQQ','IWM','DIA'].map(sym=>watch.find(x=>x.symbol===sym)).filter(Boolean);
+ const up=majors.filter(x=>Number(x.change_pct)>0).length;
+ $('breadth').textContent=majors.length?up+'/'+majors.length+' up':'—';
+ const best=s.best_candidate;
+ $('best-body').replaceChildren();
+ if(best&&fresh){
+  $('best-title').textContent=best.underlying+' '+best.type+' · '+best.expiration;
+  $('best-note').textContent='Highest-ranked research candidate from the latest snapshot. This is not a buy instruction.';
+  $('best-body').append(renderCandidate(best));
+ }else{
+  $('best-title').textContent=!fresh?'No fresh candidate — snapshot is stale':'No qualifying options candidate';
+  $('best-note').textContent=s.warning||'The screen found no candidate above the minimum score, or current data is unavailable.';
+ }
+ const box=$('candidates');box.replaceChildren();
+ if(candidates.length){candidates.forEach(c=>box.append(renderCandidate(c)))}
+ else{const empty=document.createElement('div');empty.className='empty';empty.textContent='No candidates returned. No trade is a valid result.';box.append(empty)}
+ const pulse=$('pulse');pulse.replaceChildren();
+ watch.forEach(x=>{const tr=document.createElement('tr');const vals=[x.symbol,money(x.last),pct(x.change_pct),Number(x.volume||0).toLocaleString(),x.scan_enabled?'SCANNED':'WATCH ONLY'];vals.forEach((v,i)=>{const td=document.createElement('td');td.textContent=v;if(i===2)td.className=Number(x.change_pct)>0?'up':Number(x.change_pct)<0?'down':'neutral';tr.append(td)});pulse.append(tr)});
+ const grid=$('watch-grid');grid.replaceChildren();
+ watch.forEach(x=>{const item=document.createElement('div');item.className='watch';const left=document.createElement('div');const b=document.createElement('b');b.textContent=x.symbol;const small=document.createElement('small');small.textContent=x.leveraged?'Leveraged / inverse':x.scan_enabled?'Options scan enabled':'Watch only';left.append(b,small);const right=document.createElement('div');right.className='price';right.textContent=money(x.last);const ch=document.createElement('small');ch.textContent=pct(x.change_pct);ch.className=Number(x.change_pct)>0?'up':Number(x.change_pct)<0?'down':'neutral';right.append(ch);item.append(left,right);grid.append(item)});
+ const coverage=$('coverage');coverage.replaceChildren();
+ (s.symbol_status||[]).forEach(x=>{const tr=document.createElement('tr');[x.symbol,x.status,x.trend||'—',x.rsi14??'—',pct(x.return5d_pct),x.contracts_reviewed??'—'].forEach(v=>{const td=document.createElement('td');td.textContent=safeText(v);tr.append(td)});coverage.append(tr)});
+ if(!fresh&&s.feed_status==='SNAPSHOT_AVAILABLE')statusPill('feed-status','STALE — VERIFY BEFORE USE','bad');
+}
+async function loadSnapshot(){
+ $('refresh').disabled=true;$('refresh').textContent='Loading…';
+ try{const response=await fetch('./markets-now.json?ts='+Date.now(),{cache:'no-store'});if(!response.ok)throw new Error('Snapshot not published');const data=await response.json();if(data.schema!=='markets-now-snapshot-v1'||data.orders_enabled!==false||data.research_only!==true)throw new Error('Snapshot failed safety validation');snapshot=data;render()}
+ catch(e){statusPill('feed-status','FEED UNAVAILABLE','bad');$('best-title').textContent='No verified market snapshot';$('best-note').textContent='No trade candidates will be displayed without a valid snapshot.';$('best-body').replaceChildren();$('candidates').innerHTML='<div class="empty">Feed unavailable. Try again later.</div>'}
+ finally{$('refresh').disabled=false;$('refresh').textContent='Refresh snapshot'}
+}
+const JOURNAL_KEY='markets-now-journal-v1';
+function journalRead(){try{return JSON.parse(localStorage.getItem(JOURNAL_KEY)||'[]')}catch{return []}}
+function journalRender(){const box=$('journal-items');box.replaceChildren();const rows=journalRead();if(!rows.length){const e=document.createElement('div');e.className='empty';e.textContent='No journal entries yet.';box.append(e);return}rows.slice().reverse().forEach(x=>{const item=document.createElement('div');item.className='journalitem';const left=document.createElement('div');const b=document.createElement('b');b.textContent=x.symbol+' · '+x.side;const p=document.createElement('div');p.className='muted';p.textContent=[x.expiration?'Exp '+x.expiration:'',x.entry?'Entry '+x.entry:'',x.exit?'Exit '+x.exit:'',x.result?'P&L '+x.result:''].filter(Boolean).join(' · ');const note=document.createElement('div');note.textContent=x.thesis||'No thesis recorded';left.append(b,p,note);const date=document.createElement('small');date.className='muted';date.textContent=new Date(x.created).toLocaleDateString();item.append(left,date);box.append(item)})}
+$('save-trade').addEventListener('click',()=>{const symbol=$('j-symbol').value.trim();if(!symbol){$('j-symbol').focus();return}const rows=journalRead();rows.push({symbol,side:$('j-side').value,expiration:$('j-exp').value,entry:$('j-entry').value,exit:$('j-exit').value,result:$('j-result').value,thesis:$('j-thesis').value.trim(),created:new Date().toISOString()});try{localStorage.setItem(JOURNAL_KEY,JSON.stringify(rows));['j-symbol','j-exp','j-entry','j-exit','j-result','j-thesis'].forEach(id=>$(id).value='');journalRender()}catch{$('journal-items').textContent='Unable to save local journal in this browser.'}});
+$('clear-journal').addEventListener('click',()=>{if(confirm('Clear all journal entries saved on this device?')){localStorage.removeItem(JOURNAL_KEY);journalRender()}});
+$('refresh').addEventListener('click',loadSnapshot);journalRender();loadSnapshot();
+</script>
+</body></html>
