@@ -1,0 +1,30 @@
+name: Markets Now Tests
+on:
+  pull_request:
+    paths:
+      - 'research/markets_now.py'
+      - 'tests/test_markets_now.py'
+      - 'tests/check_markets_now_html.mjs'
+      - 'markets-now/**'
+      - '.github/workflows/markets-now-tests.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'research/markets_now.py'
+      - 'tests/test_markets_now.py'
+      - 'tests/check_markets_now_html.mjs'
+      - 'markets-now/**'
+      - '.github/workflows/markets-now-tests.yml'
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install requests
+      - run: node tests/check_markets_now_html.mjs
+      - run: python -m unittest tests.test_markets_now -v

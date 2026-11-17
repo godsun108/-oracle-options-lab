@@ -24,7 +24,7 @@ class ArenaWorkflowFallbackTests(unittest.TestCase):
                     for flag in ('broker_fills_verified', 'edge_proven', 'published'):
                         if flag in data:
                             self.assertIs(data[flag], False)
-        self.assertEqual(count, 5)
+        self.assertEqual(count, 6)
 
 
 if __name__ == '__main__':

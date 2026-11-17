@@ -4,11 +4,15 @@ on:
     branches: [main]
     paths:
       - 'arena/**'
+      - 'markets-now/**'
+      - 'research/markets_now.py'
+      - 'tests/test_markets_now.py'
+      - '.github/workflows/markets-now-live.yml'
       - 'tests/check_arena_html.mjs'
       - '.github/workflows/arena-pages.yml'
   workflow_dispatch:
   workflow_run:
-    workflows: ['Oracle-Q Arena Evidence Review']
+    workflows: ['Oracle-Q Arena Evidence Review', 'Markets Now Read-only Scanner']
     types: [completed]
     branches: [main]
   schedule:
@@ -42,7 +46,7 @@ jobs:
       - name: Obtain most recent reviewed production snapshot
         env:
           GH_TOKEN: ${{ github.token }}
-          TRIGGER_RUN_ID: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || '' }}
+          TRIGGER_RUN_ID: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.name == 'Oracle-Q Arena Evidence Review' && github.event.workflow_run.id || '' }}
         run: |
           mkdir -p out/arena-review
           RUN_ID="$TRIGGER_RUN_ID"
@@ -67,6 +71,33 @@ jobs:
           assert r["status"] == "completed" and r["conclusion"] == "success"
           PY
           gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" --name oracle-q-arena-evidence-review --dir out/arena-review
+      - name: Obtain latest Markets Now market snapshot
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TRIGGER_RUN_ID: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.name == 'Markets Now Read-only Scanner' && github.event.workflow_run.id || '' }}
+        run: |
+          mkdir -p out/markets-now
+          RUN_ID="$TRIGGER_RUN_ID"
+          if [ -z "$RUN_ID" ]; then
+            RUN_ID=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow markets-now-live.yml --branch main --status success --limit 10 --json databaseId,event --jq '[.[] | select(.event == "schedule" or .event == "workflow_dispatch")][0].databaseId // empty')
+          fi
+          if [ -n "$RUN_ID" ]; then
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID" > out/markets-now/source-run.json
+            python - <<'PY'
+          import json, os
+          from pathlib import Path
+          r=json.loads(Path("out/markets-now/source-run.json").read_text())
+          assert r["path"] == ".github/workflows/markets-now-live.yml"
+          assert r["head_branch"] == "main"
+          assert r["head_repository"]["full_name"] == os.environ["GITHUB_REPOSITORY"]
+          assert r["status"] == "completed" and r["conclusion"] == "success"
+          assert r["event"] in ("schedule", "workflow_dispatch")
+          PY
+            gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" --name markets-now-snapshot --dir out/markets-now
+          fi
+          if ! test -s out/markets-now/markets-now.json; then
+            printf '%s\n' '{"schema":"markets-now-snapshot-v1","generated_at_utc":null,"market_session":"UNKNOWN","provider":"tradier","feed_status":"UNAVAILABLE","watchlist":[],"candidates":[],"best_candidate":null,"orders_enabled":false,"research_only":true,"edge_proven":false,"warning":"No successful Markets Now snapshot is available yet."}' > out/markets-now/markets-now.json
+          fi
       - name: Project audited progress, or retain empty feed
         run: |
           if test -s out/arena-review/arena-frozen-league-review.json; then
@@ -138,13 +169,15 @@ jobs:
       - name: Prepare Pages site
         run: |
           mkdir -p _site
-          mkdir -p _site/arena
+          mkdir -p _site/arena _site/markets-now
           cp arena/index.html _site/arena/index.html
+          cp markets-now/index.html _site/markets-now/index.html
+          cp out/markets-now/markets-now.json _site/markets-now/markets-now.json
           cp out/arena-feed.json _site/arena/arena-feed.json
           cp out/arena-agent-positions.json _site/arena/arena-agent-positions.json
           cp out/arena-agent-history.json _site/arena/arena-agent-history.json
           cp out/arena-paper-delta.json _site/arena/arena-paper-delta.json
-          printf '<!doctype html><meta http-equiv="refresh" content="0; url=./arena/"><a href="./arena/">Oracle-Q Arena</a>\n' > _site/index.html
+          printf '<!doctype html><meta http-equiv="refresh" content="0; url=./markets-now/"><a href="./markets-now/">Markets Now</a> · <a href="./arena/">Oracle-Q Arena</a>\n' > _site/index.html
           printf 'Oracle-Q Arena is a research-only spectator preview. No verified live trading feed is connected.\n' > _site/arena/STATUS.txt
       - uses: actions/upload-pages-artifact@v3
         with:

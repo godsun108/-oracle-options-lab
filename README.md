@@ -12,3 +12,11 @@ asserts data-cutoff provenance between underlying and options providers.
   accumulated prospective history (the only accepted evidence class)
 
 Run tests: `python -m pytest -q`
+
+## Markets Now dashboard
+
+Mobile-first market and options research dashboard:
+- [Open Markets Now](https://godsun108.github.io/-oracle-options-lab/markets-now/)
+- [Markets Now architecture and data contract](docs/MARKETS_NOW.md)
+
+Markets Now publishes read-only Tradier market snapshots and ranks research candidates. It never places orders; see the safety and data-freshness limitations before relying on a snapshot.
