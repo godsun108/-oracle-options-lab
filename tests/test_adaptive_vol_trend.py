@@ -3,15 +3,22 @@ import unittest
 from datetime import date, timedelta
 
 from research.adaptive_vol_trend import evaluate, target_weight
+from research.edge_session_calendar import is_session
 
 
 def bars(count=280):
     start = date(2025, 1, 1)
     rows = []
-    for i in range(count):
+    i = 0
+    while len(rows) < count:
+        day = start + timedelta(days=i)
+        i += 1
+        if not is_session(day):
+            continue
+        n = len(rows)
         # Deterministic upward drift with nonzero volatility.
-        price = 100.0 * math.exp(0.0012 * i + 0.004 * math.sin(i * 1.71))
-        rows.append({"time": (start + timedelta(days=i)).isoformat(), "open": price})
+        price = 100.0 * math.exp(0.0012 * n + 0.004 * math.sin(n * 1.71))
+        rows.append({"time": day.isoformat(), "open": price})
     return rows
 
 
