@@ -10,6 +10,7 @@ import math
 import statistics
 
 from research.edge_lab import SYMBOLS
+from research.edge_session_calendar import validate_sequence
 
 CANDIDATE_ID = "adaptive_vol_trend_001"
 LOOKBACK_TREND = 200
@@ -39,6 +40,7 @@ def _validate_bars(bars):
             raise ValueError("open must be finite and positive")
         clean.append({"time": stamp, "open": float(price)})
         previous = stamp
+    validate_sequence([row['time'] for row in clean])
     return clean
 
 
