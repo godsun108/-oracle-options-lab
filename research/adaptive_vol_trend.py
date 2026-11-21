@@ -96,7 +96,7 @@ def evaluate(bars, *, symbol, initial_capital=2000.0,
             or not 0 <= cost_bps_per_full_turnover <= 1000):
         raise ValueError("invalid turnover cost")
     data = _validate_bars(bars)
-    minimum = LOOKBACK_TREND + 2
+    minimum = LOOKBACK_TREND + 3
     if len(data) < minimum:
         return {
             "schema": "oracle-q-adaptive-vol-trend-result-v1",
