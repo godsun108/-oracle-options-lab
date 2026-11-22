@@ -14,6 +14,7 @@ from research.adaptive_vol_trend import (
     LOOKBACK_TREND, _validate_bars, target_weight,
 )
 from research.edge_lab import signal as incumbent_signal
+from research.edge_lab import SYMBOLS
 
 CONTROL_IDS = ("tsmom_63", "trend_200")
 COMPARATOR_IDS = ("buy_hold", "zero_yield_cash")
@@ -82,6 +83,8 @@ def _metrics(weights, period_returns, initial_capital, cost_bps):
 def compare_market(bars, *, symbol, initial_capital=2000.0,
                    cost_bps_per_full_turnover=DEFAULT_COST_BPS_PER_FULL_TURNOVER):
     """Return candidate and controls on one strictly paired daily-open window."""
+    if symbol not in SYMBOLS:
+        raise ValueError("unregistered market")
     if type(initial_capital) not in (int, float) or not math.isfinite(initial_capital) or initial_capital <= 0:
         raise ValueError("initial capital must be finite and positive")
     if (type(cost_bps_per_full_turnover) not in (int, float)
