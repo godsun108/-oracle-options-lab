@@ -60,6 +60,10 @@ class AdaptiveVolComparisonTests(unittest.TestCase):
                 high["strategies"][strategy_id]["net_return_pct"],
             )
 
+    def test_unknown_market_rejected(self):
+        with self.assertRaises(ValueError):
+            compare_market(bars(), symbol="XYZ")
+
     def test_insufficient_data_fails_closed(self):
         result = compare_market(bars(202), symbol="SPY")
         self.assertEqual(result["status"], "INSUFFICIENT_DATA")
