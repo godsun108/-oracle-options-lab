@@ -49,6 +49,8 @@ class AdaptiveVolComparisonTests(unittest.TestCase):
         self.assertFalse(result["broker_fills_verified"])
         self.assertFalse(result["edge_proven"])
         self.assertFalse(result["eligible_for_live_trading"])
+        self.assertEqual(set(result["stress_25bps"]), set(result["strategies"]))
+        self.assertEqual(result["stress_25bps"]["adaptive_vol_trend_001"]["cost_bps_per_full_turnover"], 25.0)
 
     def test_higher_costs_do_not_improve_any_strategy_net_return(self):
         source = bars()
