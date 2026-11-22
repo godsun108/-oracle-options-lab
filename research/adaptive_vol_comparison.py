@@ -113,18 +113,22 @@ def compare_market(bars, *, symbol, initial_capital=2000.0,
         weights["buy_hold"].append(1.0)
         weights["zero_yield_cash"].append(0.0)
 
-    summaries = {
-        strategy_id: _metrics(strategy_weights, period_returns, initial_capital,
-                               cost_bps_per_full_turnover)
-        for strategy_id, strategy_weights in weights.items()
-    }
-    incumbent = max(summaries[sid]["net_return_pct"] for sid in CONTROL_IDS)
-    summaries[CANDIDATE_ID]["excess_vs_better_trend_control_pct"] = round(
-        summaries[CANDIDATE_ID]["net_return_pct"] - incumbent, 8
-    )
-    summaries[CANDIDATE_ID]["excess_vs_buy_hold_pct"] = round(
-        summaries[CANDIDATE_ID]["net_return_pct"] - summaries["buy_hold"]["net_return_pct"], 8
-    )
+    def summarize(cost_bps):
+        rows = {
+            strategy_id: _metrics(strategy_weights, period_returns, initial_capital, cost_bps)
+            for strategy_id, strategy_weights in weights.items()
+        }
+        incumbent = max(rows[sid]["net_return_pct"] for sid in CONTROL_IDS)
+        rows[CANDIDATE_ID]["excess_vs_better_trend_control_pct"] = round(
+            rows[CANDIDATE_ID]["net_return_pct"] - incumbent, 8
+        )
+        rows[CANDIDATE_ID]["excess_vs_buy_hold_pct"] = round(
+            rows[CANDIDATE_ID]["net_return_pct"] - rows["buy_hold"]["net_return_pct"], 8
+        )
+        return rows
+
+    summaries = summarize(cost_bps_per_full_turnover)
+    stress_summaries = summarize(25.0)
     return {
         "schema": "oracle-q-adaptive-vol-trend-comparison-v1",
         "candidate_id": CANDIDATE_ID, "symbol": symbol,
@@ -133,7 +137,9 @@ def compare_market(bars, *, symbol, initial_capital=2000.0,
         "first_entry_session": data[entries[0]]["time"],
         "last_exit_session": data[entries[-1] + 1]["time"],
         "cost_convention": "bps_per_full_turnover_on_absolute_weight_change; initial entry and final liquidation charged",
+        "primary_cost_bps_per_full_turnover": float(cost_bps_per_full_turnover),
         "strategies": summaries,
+        "stress_25bps": stress_summaries,
         "paired_dates_identical": True,
         "orders_enabled": False, "broker_fills_verified": False,
         "edge_proven": False, "eligible_for_live_trading": False,
